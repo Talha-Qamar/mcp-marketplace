@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version Watcher — MCP Secure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top:2rem;padding-bottom:4rem;">
+        <div class="mcs-page-header">
+            <div class="mcs-page-badge">🔒 MCP Secure — Feature 3</div>
+            <h1>Version Change Watcher</h1>
+            <p style="margin:0;max-width:720px;">
+                The watcher monitors published servers for content changes. When the content fingerprint changes,
+                an automatic re-scan is triggered and the old attestation is marked superseded.
+                Demonstrates Figure 2 of the MCP Secure overview.
+            </p>
+        </div>
+
+        <!-- Legend -->
+        <div id="mcs-legend-container"></div>
+
+        <!-- How it works -->
+        <div class="mcs-chain-note" style="margin-bottom:2rem;">
+            <strong>How the watcher works:</strong>
+            <span style="margin-left:0.5rem;">📄 <strong>Docs-only update</strong> → commit SHA changes, but content fingerprint stays the same → verdict carried forward, no re-scan.</span>
+            <span style="margin-left:1rem;">☠ <strong>Bait-and-switch update</strong> → fingerprint changes → status: <em>change_detected</em> → automatic re-scan → new versioned attestation → old PASS marked superseded.</span>
+        </div>
+
+        <div class="mcs-watcher-root">
+            <div id="watcher-main-container"></div>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        MCSViews.renderMCSLegend(document.getElementById('mcs-legend-container'));
+        await MCSWatcher.render(document.getElementById('watcher-main-container'));
+    });
+    </script>
+</body>
+</html>

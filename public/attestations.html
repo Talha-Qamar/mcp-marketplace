@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attestation Explorer — MCP Secure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top:2rem;padding-bottom:4rem;">
+        <div class="mcs-page-header">
+            <div class="mcs-page-badge">🔒 MCP Secure — Feature 2</div>
+            <h1>Blockchain & Attestation Explorer</h1>
+            <p style="margin:0;max-width:720px;">
+                Every scan produces a signed, logged, and chain-anchored attestation. Inspect records,
+                verify Ed25519 signatures, check Merkle inclusion proofs, and trace anchors — all live in your browser.
+            </p>
+        </div>
+
+        <!-- Legend -->
+        <div id="mcs-legend-container"></div>
+
+        <!-- Tabs -->
+        <div class="mcs-tabs" style="margin-bottom:1.5rem;">
+            <button class="mcs-tab active" onclick="showTab('tab-inspect', this)">📋 Attestation Record</button>
+            <button class="mcs-tab" onclick="showTab('tab-log', this)">📊 Transparency Log</button>
+            <button class="mcs-tab" onclick="showTab('tab-chain', this)">⛓ Block Explorer</button>
+            <button class="mcs-tab" onclick="showTab('tab-verify', this)">✅ Verify a Server</button>
+        </div>
+
+        <!-- Tab: Attestation Inspector -->
+        <div id="tab-inspect" class="mcs-tab-content" style="display:block;">
+            <div class="card" style="margin-bottom:1.5rem;">
+                <h3 style="margin-bottom:1rem;">Look up an Attestation</h3>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="form-field" style="flex:1;min-width:250px;margin:0;">
+                        <label class="label">Attestation ID (SHA-256)</label>
+                        <input class="input" id="att-id-input" placeholder="Enter attestation ID…">
+                    </div>
+                    <button class="btn btn-primary" onclick="loadAttestation()">Load</button>
+                </div>
+                <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <span style="color:var(--text-3);font-size:0.8125rem;">Or load a demo:</span>
+                    <button class="btn btn-outline btn-xs" onclick="loadBySlug('weather-tools')">weather-tools (PASS)</button>
+                    <button class="btn btn-outline btn-xs" onclick="loadBySlug('db-helper')">db-helper (REVIEW)</button>
+                    <button class="btn btn-outline btn-xs" onclick="loadBySlug('shell-runner')">shell-runner (FAIL)</button>
+                </div>
+            </div>
+            <div id="attestation-inspector-container"></div>
+        </div>
+
+        <!-- Tab: Transparency Log -->
+        <div id="tab-log" class="mcs-tab-content" style="display:none;">
+            <div id="log-explorer-container"></div>
+        </div>
+
+        <!-- Tab: Chain Explorer -->
+        <div id="tab-chain" class="mcs-tab-content" style="display:none;">
+            <div id="chain-explorer-container"></div>
+        </div>
+
+        <!-- Tab: Verify a Server -->
+        <div id="tab-verify" class="mcs-tab-content" style="display:none;">
+            <div class="card" style="margin-bottom:1.5rem;">
+                <h3 style="margin-bottom:0.5rem;">Verify a Server — Live Crypto Checks</h3>
+                <p style="color:var(--text-2);font-size:0.875rem;margin-bottom:1.25rem;">
+                    Select a server to recompute its fingerprint and run all 5 verification checks live in your browser.
+                    This uses real SHA-256, Ed25519, and Merkle proof verification — not simulated.
+                </p>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+                    <button class="btn btn-outline" onclick="loadVerify('weather-tools')">🌤 weather-tools</button>
+                    <button class="btn btn-outline" onclick="loadVerify('db-helper')">🗄 db-helper</button>
+                    <button class="btn btn-outline" onclick="loadVerify('shell-runner')">💀 shell-runner</button>
+                </div>
+                <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+                    <div class="form-field" style="flex:1;margin:0;">
+                        <label class="label">Server Slug</label>
+                        <input class="input" id="verify-slug-input" placeholder="e.g. weather-tools">
+                    </div>
+                    <button class="btn btn-primary" onclick="startVerify()">▶ Verify Now</button>
+                </div>
+            </div>
+            <div id="verify-flow-container"></div>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        MCSViews.renderMCSLegend(document.getElementById('mcs-legend-container'));
+
+        // Check for ?id= param
+        const params = new URLSearchParams(location.search);
+        const attId = params.get('id');
+        if (attId) {
+            document.getElementById('att-id-input').value = attId;
+            loadAttestation();
+        }
+
+        // Pre-load log and chain in background
+        loadLogIfVisible();
+        loadChainIfVisible();
+    });
+
+    function showTab(tabId, btn) {
+        document.querySelectorAll('.mcs-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.mcs-tab-content').forEach(t => t.style.display = 'none');
+        btn.classList.add('active');
+        document.getElementById(tabId).style.display = 'block';
+
+        // Lazy-load content
+        if (tabId === 'tab-log') loadLog();
+        if (tabId === 'tab-chain') loadChain();
+    }
+
+    async function loadAttestation() {
+        const id = document.getElementById('att-id-input').value.trim();
+        if (!id) { alert('Enter an attestation ID'); return; }
+        const container = document.getElementById('attestation-inspector-container');
+        container.innerHTML = '<div style="padding:2rem;text-align:center;"><span class="mcs-spinner" style="width:1.5rem;height:1.5rem;"></span></div>';
+        try {
+            const record = await MCSAPI.getAttestation(id);
+            await MCSAttestations.renderAttestationInspector(container, record);
+        } catch (e) {
+            container.innerHTML = `<div class="card" style="border-color:var(--error);">Error: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function loadBySlug(slug) {
+        try {
+            const scans = await MCSAPI.getScans(slug);
+            if (scans.length === 0) { alert('No scans found for ' + slug + '. Run a scan first.'); return; }
+            document.getElementById('att-id-input').value = scans[0].id;
+            await loadAttestation();
+        } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function loadLog() {
+        const container = document.getElementById('log-explorer-container');
+        container.innerHTML = '<div style="padding:2rem;text-align:center;"><span class="mcs-spinner" style="width:1.5rem;height:1.5rem;"></span></div>';
+        try { await MCSAttestations.renderLogExplorer(container); }
+        catch (e) { container.innerHTML = `<div class="card" style="border-color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
+    }
+
+    function loadLogIfVisible() { /* deferred */ }
+
+    async function loadChain() {
+        const container = document.getElementById('chain-explorer-container');
+        container.innerHTML = '<div style="padding:2rem;text-align:center;"><span class="mcs-spinner" style="width:1.5rem;height:1.5rem;"></span></div>';
+        try { await MCSAttestations.renderChainExplorer(container); }
+        catch (e) { container.innerHTML = `<div class="card" style="border-color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
+    }
+
+    function loadChainIfVisible() { /* deferred */ }
+
+    async function loadVerify(slug) {
+        document.getElementById('verify-slug-input').value = slug;
+        await startVerify();
+    }
+
+    async function startVerify() {
+        const slug = document.getElementById('verify-slug-input').value.trim();
+        if (!slug) { alert('Enter a server slug'); return; }
+
+        const container = document.getElementById('verify-flow-container');
+        container.innerHTML = '<div style="padding:2rem;text-align:center;"><span class="mcs-spinner" style="width:1.5rem;height:1.5rem;"></span> Loading server…</div>';
+
+        try {
+            // Fetch server data from marketplace API
+            const resp = await fetch('/api/servers/' + encodeURIComponent(slug));
+            if (!resp.ok) throw new Error('Server not found: ' + slug);
+            const server = await resp.json();
+
+            const serverData = {
+                name: server.name,
+                description: server.description,
+                long_description: server.long_description,
+                github_url: server.github_url,
+                tools: (server.tools || []).map(t => ({ name: t.name, description: t.description })),
+            };
+
+            await MCSVerify.runVerifyFlow(container, serverData);
+        } catch (e) {
+            container.innerHTML = `<div class="card" style="border-color:var(--error);">Error: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+    </script>
+</body>
+</html>

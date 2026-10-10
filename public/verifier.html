@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>External Verifier — MCP Secure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:960px;">
+
+        <!-- Framing header -->
+        <div class="mcs-page-header">
+            <div class="mcs-page-badge">🔒 MCP Secure — Feature 4 (Figure 7)</div>
+            <h1>MCP Secure — Verification Service</h1>
+            <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;margin-top:1rem;">
+                <div style="flex:1;min-width:280px;">
+                    <p style="margin:0;max-width:640px;">
+                        This page represents <strong>MCP Secure's own MCP server</strong> being called by
+                        an <strong>external party</strong> — another marketplace or an end user — to check a server
+                        before use or listing. The candidate is scanned using the exact same pipeline, but is
+                        <strong>never onboarded into this marketplace's catalog.</strong>
+                    </p>
+                </div>
+                <div style="flex-shrink:0;">
+                    <div class="mcs-enforced-badge">⛔ onboarded: false — always enforced</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div id="mcs-legend-container"></div>
+
+        <!-- Main verifier UI (rendered by MCSVerifier.render) -->
+        <div id="verifier-root"></div>
+
+        <!-- Recent external requests -->
+        <div id="external-requests-section" style="margin-top:3rem;display:none;">
+            <h2 style="margin-bottom:1rem;">Recent External Verification Requests</h2>
+            <div id="external-requests-container"></div>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        MCSViews.renderMCSLegend(document.getElementById('mcs-legend-container'));
+        await MCSVerifier.render(document.getElementById('verifier-root'));
+        await loadExternalRequests();
+    });
+
+    async function loadExternalRequests() {
+        try {
+            const requests = await MCSAPI.getExternalRequests();
+            if (requests.length === 0) return;
+
+            const section = document.getElementById('external-requests-section');
+            const container = document.getElementById('external-requests-container');
+            section.style.display = 'block';
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="mcs-log-table-wrap">
+                        <table class="mcs-table">
+                            <thead><tr>
+                                <th>Requester</th>
+                                <th>Candidate Ref</th>
+                                <th>Verdict</th>
+                                <th>Attestation ID</th>
+                                <th>Time</th>
+                                <th>Actions</th>
+                            </tr></thead>
+                            <tbody>
+                                ${requests.map(r => `
+                                <tr>
+                                    <td>${escapeHtml(r.requesterName || 'Anonymous')}</td>
+                                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.candidateRef)}">${escapeHtml(r.candidateRef)}</td>
+                                    <td>${verdictBadge(r.verdict || 'UNKNOWN')}</td>
+                                    <td><code class="mcs-hash-short" title="${r.attestationId}">${(r.attestationId || '—').slice(0, 20)}…</code></td>
+                                    <td style="font-size:0.8rem;color:var(--text-3)">${new Date(r.createdAt).toLocaleString()}</td>
+                                    <td>
+                                        ${r.attestationId ? `<a href="/attestations?id=${r.attestationId}" class="btn btn-outline btn-xs">View →</a>` : '—'}
+                                    </td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (e) { /* non-critical */ }
+    }
+    </script>
+</body>
+</html>

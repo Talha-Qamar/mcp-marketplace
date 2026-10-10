@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Scan — MCP Secure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:960px;">
+        <div class="mcs-page-header">
+            <div class="mcs-page-badge">🔒 MCP Secure — Feature 1</div>
+            <h1>Security Scan Pipeline</h1>
+            <p style="margin:0;max-width:640px;">
+                Watch a server flow through the full detection pipeline — fingerprinting, three parallel analyzers,
+                deterministic policy engine — to a signed, blockchain-anchored verdict.
+            </p>
+        </div>
+
+        <!-- Legend -->
+        <div id="mcs-legend-container"></div>
+
+        <!-- Server selector / trigger -->
+        <div class="card" id="scan-selector" style="margin-bottom:2rem;">
+            <h3 style="margin-bottom:1rem;">Select a Server to Scan</h3>
+            <p style="color:var(--text-3);font-size:0.875rem;margin-bottom:1.25rem;">
+                Choose one of the demo servers below, or use the field to scan any marketplace server.
+                Results are deterministic — the same server always produces the same verdict.
+            </p>
+
+            <!-- Demo server quick-picks -->
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+                <button class="btn btn-outline" id="pick-weather" onclick="pickServer('weather-tools')">
+                    🌤 Weather Tools <span style="color:var(--success);font-size:0.75rem;">(expects PASS)</span>
+                </button>
+                <button class="btn btn-outline" id="pick-dbhelper" onclick="pickServer('db-helper')">
+                    🗄 DB Helper <span style="color:var(--warning);font-size:0.75rem;">(expects REVIEW)</span>
+                </button>
+                <button class="btn btn-outline" id="pick-shell" onclick="pickServer('shell-runner')">
+                    💀 Shell Runner <span style="color:var(--error);font-size:0.75rem;">(expects FAIL)</span>
+                </button>
+            </div>
+
+            <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+                <div class="form-field" style="flex:1;min-width:200px;margin:0;">
+                    <label class="label" for="server-slug-input">Server Slug</label>
+                    <input class="input" id="server-slug-input" placeholder="e.g. weather-tools" value="">
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-2);font-size:0.875rem;cursor:pointer;">
+                        <input type="checkbox" id="fast-mode-toggle"> Fast mode (skip delays)
+                    </label>
+                </div>
+                <button class="btn btn-primary" id="scan-btn" onclick="startScan()">
+                    ▶ Run Scan
+                </button>
+            </div>
+        </div>
+
+        <!-- Pipeline output -->
+        <div id="pipeline-container" style="display:none;">
+            <div id="pipeline-inner"></div>
+        </div>
+
+        <!-- Rescan controls -->
+        <div id="rescan-controls" style="display:none;margin-top:2rem;text-align:center;">
+            <button class="btn btn-outline" onclick="resetScan()">← Scan Another Server</button>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Render legend
+        MCSViews.renderMCSLegend(document.getElementById('mcs-legend-container'));
+
+        // Fast mode toggle
+        document.getElementById('fast-mode-toggle').addEventListener('change', (e) => {
+            window.FAST_MODE = e.target.checked;
+        });
+
+        // Pre-fill from URL param
+        const params = new URLSearchParams(location.search);
+        const preSlug = params.get('server');
+        if (preSlug) {
+            document.getElementById('server-slug-input').value = preSlug;
+            if (params.has('fast')) { window.FAST_MODE = true; document.getElementById('fast-mode-toggle').checked = true; }
+            // Auto-start if prefill=true
+            if (params.has('prefill')) setTimeout(() => startScan(), 500);
+        }
+    });
+
+    function pickServer(slug) {
+        document.getElementById('server-slug-input').value = slug;
+        document.querySelectorAll('#scan-selector .btn').forEach(b => b.classList.remove('active'));
+        const el = document.getElementById('pick-' + slug.replace('-', ''));
+        if (el) el.style.borderColor = 'var(--accent)';
+    }
+
+    async function startScan() {
+        const slug = document.getElementById('server-slug-input').value.trim();
+        if (!slug) { alert('Please enter a server slug or pick a demo server.'); return; }
+
+        const btn = document.getElementById('scan-btn');
+        btn.disabled = true;
+        btn.textContent = 'Scanning…';
+
+        document.getElementById('scan-selector').style.display = 'none';
+        document.getElementById('pipeline-container').style.display = 'block';
+        document.getElementById('pipeline-inner').innerHTML = '<div style="text-align:center;padding:3rem;"><span class="mcs-spinner" style="width:2rem;height:2rem;"></span><p style="margin-top:1rem;color:var(--text-3);">Initialising detection pipeline…</p></div>';
+
+        try {
+            // Call scan API
+            const result = await MCSAPI.scan(slug);
+            // Animate pipeline
+            await renderPipelineAnimation(document.getElementById('pipeline-inner'), result, () => {
+                document.getElementById('rescan-controls').style.display = 'block';
+            });
+        } catch (e) {
+            document.getElementById('pipeline-inner').innerHTML = `
+                <div class="card" style="border-color:var(--error);text-align:center;padding:2rem;">
+                    <strong style="color:var(--error);">Scan Error</strong>
+                    <p>${escapeHtml(e.message)}</p>
+                    <button class="btn btn-outline" onclick="resetScan()">← Try again</button>
+                </div>`;
+            document.getElementById('rescan-controls').style.display = 'block';
+        }
+
+        btn.disabled = false;
+        btn.textContent = '▶ Run Scan';
+    }
+
+    function resetScan() {
+        document.getElementById('scan-selector').style.display = 'block';
+        document.getElementById('pipeline-container').style.display = 'none';
+        document.getElementById('rescan-controls').style.display = 'none';
+        document.getElementById('pipeline-inner').innerHTML = '';
+        document.getElementById('server-slug-input').value = '';
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Detail — MCP Marketplace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/index.html">Home</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="/servers.html">Servers</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="server-breadcrumb">Loading…</span>
+        </div>
+
+        <!-- Server header card -->
+        <div id="server-header" class="card" style="margin-bottom: 2rem;">
+            <!-- Injected by JS -->
+        </div>
+
+        <!-- Animated Tab Navigation -->
+        <div class="tabs-wrapper">
+            <div class="tabs">
+                <div class="tab active" data-target="tab-overview">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                    Overview
+                </div>
+                <div class="tab" data-target="tab-tools">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Tools
+                    <span class="tab-badge">—</span>
+                </div>
+                <div class="tab" data-target="tab-resources">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    Resources
+                </div>
+                <div class="tab" data-target="tab-install">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    Install
+                </div>
+                <div class="tab" data-target="tab-versions">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Versions
+                </div>
+                <div class="tab" data-target="tab-security">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    🔒 Security
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Grid -->
+        <div class="layout-detail-grid">
+            <div style="min-width: 0;">
+                <div id="tab-overview" class="tab-content active"></div>
+
+                <div id="tab-tools" class="tab-content"></div>
+
+                <div id="tab-resources" class="tab-content">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                        </div>
+                        <h3>No Resources Exposed</h3>
+                        <p>This server doesn't expose any MCP resources yet.</p>
+                    </div>
+                </div>
+
+                <div id="tab-install" class="tab-content"></div>
+
+                <div id="tab-versions" class="tab-content">
+                    <div class="doc-box">
+                        <h3>Version History</h3>
+                        <div class="callout-box" style="margin-top:1rem;">Version history is not yet available for this server. Check the GitHub repository for release notes.</div>
+                    </div>
+                </div>
+
+                <div id="tab-security" class="tab-content">
+                    <div id="security-tab-content">
+                        <div style="text-align:center;padding:2rem;"><span class="mcs-spinner" style="width:1.5rem;height:1.5rem;"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <aside id="server-sidebar" class="detail-sidebar-sticky">
+                <!-- Sidebar injected by JS -->
+            </aside>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script>
+    // Load security tab when it becomes active
+    document.addEventListener('DOMContentLoaded', () => {
+        const securityTab = document.querySelector('[data-target="tab-security"]');
+        if (securityTab) {
+            securityTab.addEventListener('click', async () => {
+                const slug = new URLSearchParams(location.search).get('slug') || location.pathname.split('/').pop();
+                await loadSecurityTab(slug);
+            });
+        }
+    });
+
+    async function loadSecurityTab(slug) {
+        const container = document.getElementById('security-tab-content');
+        if (!slug) { container.innerHTML = '<p style="color:var(--text-3)">No server slug found.</p>'; return; }
+
+        try {
+            const scans = await MCSAPI.getScans(slug);
+            const latest = scans.length > 0 ? scans[0] : null;
+            const verdict = latest?.verdict;
+
+            const verdictColor = { PASS: '#10b981', REVIEW: '#f59e0b', FAIL: '#ef4444' }[verdict] || '#64748b';
+
+            container.innerHTML = `
+                <div class="mcs-security-widget" style="margin-bottom:1.5rem;border-color:${verdictColor}30;">
+                    <div class="mcs-compact-row" style="margin-bottom:1rem;">
+                        ${verdict ? `
+                        <div style="font-size:1.5rem;font-weight:700;color:${verdictColor}">
+                            ${{ PASS: '✓ PASS', REVIEW: '⚠ REVIEW', FAIL: '✕ FAIL' }[verdict] || verdict}
+                        </div>
+                        <div>
+                            <div style="font-size:0.8125rem;color:var(--text-3);">Verified by MCP Secure · v${latest.version}</div>
+                            <div style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);">
+                                ${latest.snapshot?.contentFingerprint ? `${latest.snapshot.contentFingerprint.slice(0, 32)}…` : '<span style="color:var(--warning)">Hashes withheld (not stored in blockchain)</span>'}
+                            </div>
+                        </div>` : `<div style="color:var(--text-3)">This server has not been scanned yet.</div>`}
+                    </div>
+                    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                        <a href="/scan?server=${encodeURIComponent(slug)}" class="btn btn-primary btn-sm">🔍 Scan with MCP Secure</a>
+                        ${latest ? `<button class="btn btn-outline btn-sm" onclick="runVerifyInline('${slug}')">✅ Verify Now</button>` : ''}
+                        ${latest ? `<a href="/attestations?id=${latest.id}" class="btn btn-outline btn-sm">View Attestation →</a>` : ''}
+                    </div>
+                </div>
+
+                ${latest ? `
+                <div id="inline-verify-container"></div>
+
+                <div class="card">
+                    <h4 style="margin-bottom:1rem;">Scan History (${scans.length} scan${scans.length !== 1 ? 's' : ''})</h4>
+                    ${scans.map((s, i) => `
+                    <div style="display:flex;gap:1rem;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap;" ${i === scans.length - 1 ? 'style="border:none"' : ''}>
+                        ${verdictBadge(s.verdict)}
+                        <span style="color:var(--text-3);font-size:0.8125rem;">v${s.version} · ${new Date(s.createdAt).toLocaleString()}</span>
+                        ${s.superseded ? '<span class="mcs-sim-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;">SUPERSEDED</span>' : ''}
+                        <a href="/attestations?id=${s.id}" style="color:var(--accent);font-size:0.8125rem;margin-left:auto;">View →</a>
+                    </div>`).join('')}
+                </div>` : ''}
+            `;
+        } catch (e) {
+            container.innerHTML = `<div class="card" style="border-color:var(--error)">Error loading security data: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function runVerifyInline(slug) {
+        const container = document.getElementById('inline-verify-container');
+        container.innerHTML = '<div style="padding:1rem;text-align:center;"><span class="mcs-spinner"></span> Loading…</div>';
+        try {
+            const resp = await fetch('/api/servers/' + encodeURIComponent(slug));
+            const server = await resp.json();
+            const serverData = {
+                name: server.name, description: server.description,
+                long_description: server.long_description, github_url: server.github_url,
+                tools: (server.tools || []).map(t => ({ name: t.name, description: t.description })),
+            };
+            await MCSVerify.runVerifyFlow(container, serverData);
+        } catch (e) {
+            container.innerHTML = `<div class="card" style="border-color:var(--error)">Verify error: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+    </script>

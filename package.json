@@ -1,0 +1,19 @@
+{
+  "name": "mcp-marketplace",
+  "version": "1.0.0",
+  "description": "MCP Server Marketplace Replica — Local Testing Environment for MCP-SecureCreate FYP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node database/seed.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0",
+    "express": "^4.21.0",
+    "express-session": "^1.18.1",
+    "bcryptjs": "^2.4.3",
+    "marked": "^15.0.0",
+    "uuid": "^11.1.0"
+  }
+}

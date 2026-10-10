@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Servers — MCP Marketplace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <main class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+        <!-- Page header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h1 style="margin-bottom: 0.25rem;">Browse Servers</h1>
+                <p style="margin: 0; font-size: 0.9375rem;">Discover MCP servers for every integration need.</p>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <!-- Command-palette style search -->
+                <div class="search-bar-wrap" style="width: 320px;">
+                    <span class="search-icon-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </span>
+                    <input type="text" id="server-search-input" class="search-input" placeholder="Search servers, tags, authors…" autocomplete="off">
+                    <span class="search-kbd">⌘K</span>
+                </div>
+                <select id="sort-select" class="select" style="width: 160px;">
+                    <option value="stars">Most Stars</option>
+                    <option value="installs">Most Installs</option>
+                    <option value="newest">Newest</option>
+                    <option value="updated">Recently Updated</option>
+                </select>
+                <a href="/publish.html" class="btn btn-primary btn-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                    Publish
+                </a>
+            </div>
+        </div>
+
+        <div class="layout-sidebar">
+            <aside id="sidebar-container">
+                <!-- Filter sidebar injected here -->
+            </aside>
+
+            <div>
+                <div id="servers-grid" class="grid grid-cols-2 gap-6">
+                    <!-- Server cards injected here -->
+                </div>
+                <div id="pagination-container"></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

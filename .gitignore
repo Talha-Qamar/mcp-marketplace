@@ -1,0 +1,16 @@
+# dependencies (run `npm install`)
+node_modules/
+
+# local database: rebuilt by `npm run seed` + first `npm start`; holds personal accounts
+database/marketplace.db
+database/*.db-journal
+
+# Ed25519 signing key: generated automatically on first start; never commit it
+database/mcs_key.json
+
+# OS / editor / logs
+.DS_Store
+__MACOSX/
+*.log
+.env
+.env.*

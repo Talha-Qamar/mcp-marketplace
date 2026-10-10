@@ -1,0 +1,31 @@
+{
+  "policyVersion": "policy-v1",
+  "description": "MCP Secure deterministic policy ruleset v1. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility.",
+  "thresholds": {
+    "fail": 0.75,
+    "review": 0.40
+  },
+  "astHardFail": true,
+  "analyzers": {
+    "AST_TAINT": {
+      "weight": 1.0,
+      "hardFail": true,
+      "description": "Command injection via tainted sink reachability. A single confirmed hit causes an immediate FAIL regardless of other analyzers."
+    },
+    "MODEL_A_TEXT": {
+      "weight": 0.8,
+      "hardFail": false,
+      "description": "Simulated fine-tuned text model detecting tool-poisoning and prompt-manipulation attacks (PMA) in tool descriptions."
+    },
+    "MODEL_B_CODE": {
+      "weight": 0.9,
+      "hardFail": false,
+      "description": "Simulated fine-tuned code model detecting obfuscated command injection patterns that static AST analysis misses."
+    }
+  },
+  "modelVersionHashes": {
+    "MODEL_A_TEXT": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+    "MODEL_B_CODE": "b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a1",
+    "AST_TAINT":    "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a1b2"
+  }
+}

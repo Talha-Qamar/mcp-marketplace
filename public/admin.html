@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — MCP Secure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+      (function(){const s=localStorage.getItem('mcp_theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',s);})();
+    </script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+    <main class="container" style="padding-top:2rem;padding-bottom:5rem;">
+        <div class="mcs-page-header">
+            <div class="mcs-page-badge">MCP Secure · Admin Dashboard</div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
+                <div>
+                    <h1 style="margin:0 0 0.3rem;">Security Dashboard</h1>
+                    <p style="margin:0;color:var(--text-2);font-size:0.9375rem;">Monitor scans, review queues, version changes, and the transparency log.</p>
+                </div>
+                <div id="admin-meta" style="font-size:0.8rem;color:var(--text-3);text-align:right;"></div>
+            </div>
+        </div>
+        <div class="admin-stat-grid">
+            <div class="admin-stat-card"><div class="stat-num" id="st-total">—</div><div class="stat-label">Total Scans</div></div>
+            <div class="admin-stat-card"><div class="stat-num" id="st-pass" style="color:#34d399;">—</div><div class="stat-label">PASS</div></div>
+            <div class="admin-stat-card"><div class="stat-num" id="st-review" style="color:#fbbf24;">—</div><div class="stat-label">REVIEW</div></div>
+            <div class="admin-stat-card"><div class="stat-num" id="st-fail" style="color:#f87171;">—</div><div class="stat-label">FAIL</div></div>
+            <div class="admin-stat-card"><div class="stat-num" id="st-log">—</div><div class="stat-label">Log Entries</div></div>
+            <div class="admin-stat-card"><div class="stat-num" id="st-anchors">—</div><div class="stat-label">Chain Anchors</div></div>
+        </div>
+        <nav class="admin-nav">
+            <button class="admin-nav-item active" onclick="switchTab('servers',this)">My Servers</button>
+            <button class="admin-nav-item" onclick="switchTab('review',this)">Review Queue</button>
+            <button class="admin-nav-item" onclick="switchTab('watcher',this)">Version Watcher</button>
+            <button class="admin-nav-item" onclick="switchTab('log',this)">Transparency Log</button>
+            <button class="admin-nav-item" onclick="switchTab('chain',this)">Chain Anchors</button>
+        </nav>
+
+        <!-- My Servers -->
+        <div id="tab-servers" class="admin-tab-content active">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
+                <div>
+                    <h2 style="margin:0 0 0.2rem;">Published Servers</h2>
+                    <p style="margin:0;color:var(--text-3);font-size:0.85rem;">All servers submitted to this marketplace with their current MCP Secure verdict.</p>
+                </div>
+                <a href="/publish.html" class="btn btn-primary btn-sm">+ Publish New</a>
+            </div>
+            <div id="my-servers-list"><div class="empty-state"><span class="mcs-spinner"></span> Loading…</div></div>
+        </div>
+
+        <!-- Review Queue -->
+        <div id="tab-review" class="admin-tab-content">
+            <div style="margin-bottom:1.25rem;">
+                <h2 style="margin:0 0 0.2rem;">Review Queue</h2>
+                <p style="margin:0;color:var(--text-3);font-size:0.85rem;">Servers flagged as <span style="color:#fbbf24;font-weight:600;">REVIEW</span> requiring a human decision before appearing in the marketplace.</p>
+            </div>
+            <div id="review-queue-list"><div class="empty-state"><span class="mcs-spinner"></span> Loading…</div></div>
+        </div>
+
+        <!-- Watcher -->
+        <div id="tab-watcher" class="admin-tab-content">
+            <div id="watcher-root"><div class="empty-state"><span class="mcs-spinner"></span> Loading…</div></div>
+        </div>
+
+        <!-- Log -->
+        <div id="tab-log" class="admin-tab-content">
+            <div style="margin-bottom:1.25rem;">
+                <h2 style="margin:0 0 0.2rem;">Transparency Log</h2>
+                <p style="margin:0;color:var(--text-3);font-size:0.85rem;">Append-only Merkle log of every signed attestation. Each entry is SHA-256 hashed and signed with Ed25519.</p>
+            </div>
+            <div id="log-root"><div class="empty-state"><span class="mcs-spinner"></span> Loading…</div></div>
+        </div>
+
+        <!-- Chain -->
+        <div id="tab-chain" class="admin-tab-content">
+            <div style="margin-bottom:1.25rem;">
+                <h2 style="margin:0 0 0.2rem;">Chain Anchors</h2>
+                <p style="margin:0;color:var(--text-3);font-size:0.85rem;">Periodic Merkle root snapshots anchored to an external blockchain.</p>
+            </div>
+            <div id="chain-root"><div class="empty-state"><span class="mcs-spinner"></span> Loading…</div></div>
+        </div>
+    </main>
+    <div id="footer-container"></div>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/mcpsecure.js"></script>
+    <script src="/js/app.js"></script>
+    <script>
+    'use strict';
+    function requireLogin() {
+        const t = localStorage.getItem('token');
+        if (!t) window.location.href = '/login.html?next=/admin.html';
+        return t;
+    }
+    function switchTab(id, btn) {
+        document.querySelectorAll('.admin-nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.admin-tab-content').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + id).classList.add('active');
+        if (id === 'watcher' && !window._wL) { loadWatcher(); window._wL = true; }
+        if (id === 'log'     && !window._lL) { loadLog();     window._lL = true; }
+        if (id === 'chain'   && !window._cL) { loadChain();   window._cL = true; }
+        if (id === 'review'  && !window._rL) { loadReview();  window._rL = true; }
+    }
+    async function loadStats() {
+        try {
+            const s = await MCSAPI.getStats();
+            document.getElementById('st-total').textContent   = s.totalScans ?? '—';
+            document.getElementById('st-pass').textContent    = s.verdicts?.PASS   ?? 0;
+            document.getElementById('st-review').textContent  = s.verdicts?.REVIEW ?? 0;
+            document.getElementById('st-fail').textContent    = s.verdicts?.FAIL   ?? 0;
+            document.getElementById('st-log').textContent     = s.logLeaves ?? '—';
+            document.getElementById('st-anchors').textContent = s.anchors   ?? '—';
+        } catch(_) {}
+    }
+    async function loadMyServers() {
+        const el = document.getElementById('my-servers-list');
+        try {
+            const scans = await MCSAPI.getAllScans(200);
+            const map = new Map();
+            for (const s of (scans || [])) {
+                if (!s.superseded && !map.has(s.serverId)) map.set(s.serverId, s);
+            }
+            const rows = [...map.values()].filter(s =>
+                !s.serverId.startsWith('preview:') && !s.serverId.startsWith('external:'));
+            if (rows.length === 0) {
+                el.innerHTML = `<div class="empty-state">No servers scanned yet. <a href="/publish.html">Publish your first server →</a></div>`; return;
+            }
+            el.innerHTML = `<div class="card" style="padding:0;"><div class="mcs-log-table-wrap"><table class="mcs-table">
+                <thead><tr><th>Server</th><th>Verdict</th><th>Score</th><th>Fingerprint</th><th>Version</th><th>Scanned</th><th>Actions</th></tr></thead>
+                <tbody>${rows.map(s => `<tr>
+                  <td><strong>${escapeHtml(s.snapshot?.name || s.serverId)}</strong><br>
+                      <span style="font-size:0.72rem;color:var(--text-3);font-family:var(--font-mono);">${s.serverId.slice(0,22)}…</span></td>
+                  <td>${verdictBadge(s.verdict)}</td>
+                  <td style="font-family:var(--font-mono);font-size:0.8rem;">${((s.policyResult?.finalScore??0)*100).toFixed(0)}%</td>
+                  <td>${s.snapshot?.contentFingerprint ? `<code class="mcs-hash-short" title="${s.snapshot.contentFingerprint}">${s.snapshot.contentFingerprint.slice(0,16)}…</code>` : `<span style="color:var(--text-3);font-size:0.75rem;font-style:italic;">Withheld</span>`}</td>
+                  <td style="font-family:var(--font-mono);font-size:0.8rem;">v${s.version}</td>
+                  <td style="font-size:0.78rem;color:var(--text-3);">${new Date(s.createdAt).toLocaleDateString()}</td>
+                  <td><div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                    <a href="/attestations?id=${s.id}" class="btn btn-outline btn-xs">Attestation</a>
+                    <a href="/server-detail.html?id=${s.serverId}" class="btn btn-outline btn-xs">Detail</a>
+                  </div></td>
+                </tr>`).join('')}</tbody>
+            </table></div></div>`;
+        } catch(e) {
+            el.innerHTML = `<div class="card" style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+    async function loadReview() {
+        const el = document.getElementById('review-queue-list');
+        try {
+            const scans = await MCSAPI.getAllScans(200);
+            const queue = (scans||[]).filter(s =>
+                s.verdict === 'REVIEW' && !s.superseded &&
+                !s.serverId.startsWith('preview:') && !s.serverId.startsWith('external:'));
+            if (queue.length === 0) {
+                el.innerHTML = `<div class="empty-state" style="border-color:rgba(52,211,153,0.2);">
+                    ✓ Review queue is empty — no servers pending a decision.</div>`; return;
+            }
+            el.innerHTML = queue.map(s => `<div class="review-card">
+                <div>
+                  <div style="font-weight:600;margin-bottom:0.2rem;">${escapeHtml(s.snapshot?.name||s.serverId)}</div>
+                  <div class="review-card-meta">Score: ${((s.policyResult?.finalScore??0)*100).toFixed(0)}% · v${s.version} · ${new Date(s.createdAt).toLocaleString()}</div>
+                  <div style="margin-top:0.4rem;font-size:0.78rem;color:var(--text-3);">${(s.policyResult?.reasons||[]).join(' · ')}</div>
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+                  ${verdictBadge('REVIEW')}
+                  <a href="/attestations?id=${s.id}" class="btn btn-outline btn-sm">Attestation</a>
+                  <button class="btn btn-sm" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:#34d399;"
+                    onclick="approveRow(this)">✓ Approve</button>
+                  <button class="btn btn-sm" style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:#f87171;"
+                    onclick="rejectRow(this)">✕ Reject</button>
+                </div>
+            </div>`).join('');
+        } catch(e) { el.innerHTML = `<div style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
+    }
+    function approveRow(btn) {
+        const card = btn.closest('.review-card');
+        card.style.opacity = '0.5';
+        card.insertAdjacentHTML('beforeend','<div style="width:100%;font-size:0.8rem;color:#34d399;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(52,211,153,0.15);">✓ Approved — server will appear in the marketplace.</div>');
+        btn.disabled = true; btn.nextElementSibling.disabled = true;
+    }
+    function rejectRow(btn) {
+        const card = btn.closest('.review-card');
+        card.style.opacity = '0.5';
+        card.insertAdjacentHTML('beforeend','<div style="width:100%;font-size:0.8rem;color:#f87171;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(248,113,113,0.15);">✕ Rejected — server will not be listed.</div>');
+        btn.disabled = true; btn.previousElementSibling.disabled = true;
+    }
+    async function loadWatcher() {
+        await MCSWatcher.render(document.getElementById('watcher-root'));
+    }
+    async function loadLog() {
+        const el = document.getElementById('log-root');
+        try {
+            const [leaves, sth] = await Promise.all([MCSAPI.getLog(), MCSAPI.getSTH()]);
+            el.innerHTML = `
+              <div class="card" style="margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+                  <h3 style="margin:0;font-size:1rem;">Signed Tree Head</h3>
+                  ${realBadge('Real SHA-256 + Ed25519')}
+                </div>
+                <div class="mcs-kv-grid" style="font-size:0.8125rem;">
+                  <span class="mcs-kv-key">Tree Size</span><span class="mcs-kv-val">${sth.treeSize ?? leaves.length} leaves</span>
+                  <span class="mcs-kv-key">Root Hash</span><code class="mcs-hash-short">${(sth.rootHash||'').slice(0,52)}…</code>
+                  <span class="mcs-kv-key">Timestamp</span><span class="mcs-kv-val">${sth.timestamp ? new Date(sth.timestamp).toLocaleString() : '—'}</span>
+                  <span class="mcs-kv-key">Signature</span><code class="mcs-hash-short">${(sth.signature||'').slice(0,52)}…</code>
+                </div>
+              </div>
+              <div class="card" style="padding:0;"><div class="mcs-log-table-wrap"><table class="mcs-table">
+                <thead><tr><th>#</th><th>Attestation ID</th><th>Leaf Hash</th><th>Server</th><th>Verdict</th><th>Time</th></tr></thead>
+                <tbody>${(leaves||[]).map((l,i) => `<tr>
+                  <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-3);">${l.leafIndex??i}</td>
+                  <td><a href="/attestations?id=${l.attestationId}" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--accent);">${(l.attestationId||'').slice(0,30)}…</a></td>
+                  <td><code class="mcs-hash-short">${(l.leafHash||'').slice(0,20)}…</code></td>
+                  <td style="font-size:0.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml((l.serverId||'').replace(/^preview:|^external:/,'[ext] ').slice(0,28))}</td>
+                  <td>${verdictBadge(l.verdict||'UNKNOWN')}</td>
+                  <td style="font-size:0.72rem;color:var(--text-3);">${l.createdAt ? new Date(l.createdAt).toLocaleString() : '—'}</td>
+                </tr>`).join('')}</tbody>
+              </table></div></div>`;
+        } catch(e) { el.innerHTML = `<div style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
+    }
+    async function loadChain() {
+        const el = document.getElementById('chain-root');
+        try {
+            const anchors = await MCSAPI.getAnchors();
+            if (!anchors?.length) {
+                el.innerHTML = `<div class="empty-state">No anchors yet. Created after a threshold of log entries is reached.</div>`; return;
+            }
+            el.innerHTML = `
+              <div class="mcs-chain-note">${simBadge('Simulated')} In production the Merkle root is written to Ethereum/Polygon as a transaction. Tx hashes below are deterministic mocks.</div>
+              <div class="card" style="padding:0;"><div class="mcs-log-table-wrap"><table class="mcs-table">
+                <thead><tr><th>#</th><th>Tree Size</th><th>Root Hash</th><th>Chain</th><th>Tx Hash</th><th>Block</th><th>Anchored</th></tr></thead>
+                <tbody>${anchors.map((a,i) => `<tr>
+                  <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-3);">${i+1}</td>
+                  <td style="font-family:var(--font-mono);font-size:0.8rem;">${a.treeSize}</td>
+                  <td><code class="mcs-hash-short">${(a.rootHash||'').slice(0,20)}…</code></td>
+                  <td style="font-size:0.8rem;">${escapeHtml(a.chainName||'Ethereum Sepolia')}</td>
+                  <td><code class="mcs-hash-short">${(a.txHash||'').slice(0,20)}…</code></td>
+                  <td style="font-family:var(--font-mono);font-size:0.78rem;">${a.blockNumber??'—'}</td>
+                  <td style="font-size:0.72rem;color:var(--text-3);">${a.anchoredAt ? new Date(a.anchoredAt).toLocaleString() : '—'}</td>
+                </tr>`).join('')}</tbody>
+              </table></div></div>`;
+        } catch(e) { el.innerHTML = `<div style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
+    }
+    document.addEventListener('DOMContentLoaded', async () => {
+        requireLogin();
+        try {
+            const token = localStorage.getItem('token');
+            const me = await fetch('/api/me', { headers:{ Authorization:'Bearer '+token } }).then(r=>r.json());
+            document.getElementById('admin-meta').innerHTML =
+                `Logged in as <strong>${escapeHtml(me.username||me.email||'user')}</strong>`;
+        } catch(_) {}
+        await loadStats();
+        await loadMyServers();
+    });
+    window.switchTab   = switchTab;
+    window.approveRow  = approveRow;
+    window.rejectRow   = rejectRow;
+    </script>
+</body>
+</html>
