@@ -40,10 +40,27 @@ function simulateAnchor() {
   const leafData = leaves.map(l => l.attestationId);
   const { root } = mcsCrypto.buildMerkleTree(leafData);
 
-  // Simulated chain: monotonically increasing block number
+  // Simulated chain: monotonically increasing block number.
+  //
+  // Every value below is DERIVED, never random. The previous implementation
+  // used Math.random() for the block advance and Date.now() inside the tx
+  // hash, which made the anchor receipt the one artifact in the system that
+  // could not be reproduced from its inputs. Determinism is the project's
+  // headline property, so the mock has to honour it too — otherwise the
+  // honest answer to "is all of it deterministic?" is "no, except the bit we
+  // forgot about".
+  //
+  // Production note: a real Sepolia transaction is NOT deterministic in this
+  // way — block number and tx hash come from the network, and re-anchoring
+  // the same root would yield a different hash. What carries over is the
+  // receipt SHAPE and the fact that only the Merkle root is ever published.
   const lastBlock = store.getLatestBlockNumber();
-  const blockNumber = lastBlock + Math.floor(Math.random() * 12) + 1;
-  const txHash = '0x' + mcsCrypto.sha256hex(`anchor:${root}:${blockNumber}:${Date.now()}`).slice(0, 64);
+  const advance = (parseInt(root.slice(0, 8), 16) % 12) + 1; // 1..12, from the root
+  const blockNumber = lastBlock + advance;
+  const txHash = '0x' + mcsCrypto.sha256hex(`anchor:${root}:${blockNumber}`).slice(0, 64);
+
+  // Wall-clock, deliberately: this mirrors a real block timestamp, which is an
+  // observation rather than a derivation. It is not hashed into anything.
   const blockTimestamp = new Date().toISOString();
 
   const receipt = {
@@ -68,25 +85,45 @@ function simulateAnchor() {
  * @param {boolean} [isExternal=false]
  * @returns {{ scanRecord, attestation, logIndex, anchored }}
  */
-async function runFullPipeline(serverContent, version, isExternal = false) {
+async function runFullPipeline(serverContent, version, isExternal = false, onStage = null) {
+  const stage = async (name, status, detail) => {
+    // Reserved keys go LAST so a detail field can never clobber them.
+    if (onStage) await onStage({ ...(detail || {}), stage: name, status });
+  };
+
   // 1. Detection pipeline runs first (Analyzers + Policy Engine)
-  const scanRecord = engine.simulateScan(serverContent, version || 1);
+  const scanRecord = await engine.simulateScan(serverContent, version || 1, onStage);
 
   // 2. Check if detection and security checks are CLEAR
   if (scanRecord.verdict === 'PASS') {
     // Only once detection is clear are hashes generated and stored in blockchain
+    await stage('attest', 'start');
+    const attestedAt = Date.now();
     const attestation = buildAttestation(scanRecord);
 
     // Persist verified record
     store.saveScanRecord(scanRecord, attestation);
+    await stage('attest', 'done', {
+      ms: Date.now() - attestedAt,
+      attestationId: attestation.attestationId,
+    });
 
     // Push to transparency log (Merkle leaf)
+    await stage('log', 'start');
+    const loggedAt = Date.now();
     const leafData = attestation.attestationId;
     const leafHash = mcsCrypto.hashLeaf(leafData);
     const logIndex = store.appendLogLeaf(attestation.attestationId, leafHash);
+    await stage('log', 'done', { ms: Date.now() - loggedAt, logIndex, leafHash });
 
     // Anchor to blockchain
+    await stage('anchor', 'start');
+    const anchoredAt = Date.now();
     let anchored = simulateAnchor();
+    await stage('anchor', 'done', {
+      ms: Date.now() - anchoredAt,
+      blockNumber: anchored && anchored.blockNumber,
+    });
 
     // Update watcher row (only for marketplace servers, not preview)
     if (!isExternal) {
@@ -123,6 +160,11 @@ async function runFullPipeline(serverContent, version, isExternal = false) {
 
     // Save scan record locally for audit, but NEVER push to mcs_log_leaves or blockchain
     store.saveScanRecord(scanRecord, rejectionAttestation);
+    await stage('blocked', 'done', {
+      verdict: scanRecord.verdict,
+      attestationStatus: rejectionAttestation.status,
+      reason: scanRecord.snapshot.blockedReason || null,
+    });
 
     return {
       scanRecord,

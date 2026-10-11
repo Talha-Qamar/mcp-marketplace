@@ -56,6 +56,10 @@ CREATE TABLE IF NOT EXISTS tools (
     name TEXT NOT NULL,
     description TEXT,
     input_schema TEXT, -- JSON
+    -- Implementation source of the tool function. This is what the AST taint
+    -- analyzer parses; `description` is what Model A reads. One tool, two views.
+    source_code TEXT,
+    source_language TEXT, -- 'python' | 'typescript' | ...
     created_at TEXT NOT NULL,
     FOREIGN KEY (server_id) REFERENCES servers(id)
 );

@@ -1,11 +1,18 @@
 {
-  "policyVersion": "policy-v1",
-  "description": "MCP Secure deterministic policy ruleset v1. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility.",
+  "policyVersion": "policy-v2",
+  "description": "MCP Secure deterministic policy ruleset v2. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility. v2 adds astSeverityScores, which map the real AST taint analyzer's severity tiers onto the 0-1 analyzer score the policy engine consumes.",
   "thresholds": {
     "fail": 0.75,
     "review": 0.40
   },
   "astHardFail": true,
+  "astSeverityScores": {
+    "high": 1.0,
+    "medium": 0.55,
+    "low": 0.25,
+    "none": 0.0
+  },
+  "astSeverityScoresRationale": "high -> 1.0 trips astHardFail (>=0.6) for an immediate FAIL: unsanitized tainted data reaching a shell/exec sink within 2 hops. medium -> 0.55 sits above the review threshold (0.40) but below both the hard-fail gate and the fail threshold, so indirect flows and dynamic/file/deserialize sinks route to the REVIEW tier for human confirmation rather than auto-rejection. low -> 0.25 is a sanitized flow: reported as evidence, never verdict-changing on its own.",
   "analyzers": {
     "AST_TAINT": {
       "weight": 1.0,

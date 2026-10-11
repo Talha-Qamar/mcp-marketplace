@@ -46,12 +46,14 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 | Merkle inclusion proofs | **REAL** | Sibling path, verified in browser |
 | Transparency log (append-only) | **REAL** | SQL table, monotonic index |
 | Signed Tree Head | **REAL** | Ed25519 over `{rootHash, size, timestamp}` |
-| AST Taint Analyzer | **SIMULATED** | Regex heuristics → future: tree-sitter inter-procedural taint |
+| AST Taint Analyzer | **REAL** | Python `ast` taint engine (`ast_taint_analyzer/`, Part 2), invoked as a local subprocess. Falls back to the labelled regex heuristic for non-Python servers or when no interpreter is found |
 | Model A (text, tool poisoning) | **SIMULATED** | Regex heuristics → future: fine-tuned LoRA text model |
 | Model B (code, obfuscation) | **SIMULATED** | Regex heuristics → future: fine-tuned LoRA code model |
 | Policy Engine | **REAL** | Pure deterministic function, production-identical |
+| Tool implementation source | **REAL** | `tools.source_code` holds the Python the analyzer parses; markdown scraping is now only a fallback for servers seeded before the column existed |
+| Scan pipeline stage timings | **REAL** | Streamed over SSE from the backend as each stage completes; durations are measured, never scripted. Timings are deliberately excluded from the ScanRecord so the signed artifact stays byte-identical across runs |
 | Model C (triage agent) | **SIMULATED** | Static text → future: autonomous LLM agent with toolset |
-| Blockchain anchoring | **SIMULATED** | In-process mock → future: Ethereum Sepolia via ethers.js |
+| Blockchain anchoring | **SIMULATED** | In-process mock → future: Ethereum Sepolia via ethers.js. Every field is *derived* (block advance and tx hash come from the Merkle root), never random, so the mock preserves the project's determinism property. A real Sepolia tx would not be reproducible this way — block number and tx hash come from the network |
 | Watcher commit SHA | **SIMULATED** | SHA-256 of content → future: `git ls-remote` via cron |
 
 ---
@@ -97,6 +99,7 @@ All endpoints at `/api/mcs`:
 |---|---|---|
 | `GET` | `/pubkey` | Ed25519 public key (for client verification) |
 | `POST` | `/scan` | Run scan pipeline on a marketplace server |
+| `GET` | `/scan/stream?serverSlug=&baitAndSwitch=` | Same scan over SSE — `begin`, `stage`, `result`, `error` events with measured per-stage durations |
 | `GET` | `/scans[?serverSlug=]` | List scan records |
 | `GET` | `/attestations/:id` | Get single attestation |
 | `GET` | `/log` | Transparency log leaves + signed tree head |

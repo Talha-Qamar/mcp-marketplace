@@ -13,6 +13,7 @@
  */
 
 const mcscrpyto = require('./crypto');
+const astTaint = require('./astTaint');
 const path = require('path');
 const fs = require('fs');
 
@@ -22,9 +23,18 @@ const RULESET = JSON.parse(fs.readFileSync(RULESET_PATH, 'utf8'));
 const RULESET_HASH = mcscrpyto.sha256hex(fs.readFileSync(RULESET_PATH, 'utf8'));
 
 // ─── Analyzer 1: AST Taint (command injection — hard signal) ──────────────────
-// SIMULATED (POC): In production this runs a real AST parser (tree-sitter or
-// python-ast) and performs inter-procedural taint tracking to check if
-// attacker-controlled data reaches dangerous sinks.
+// REAL when the candidate contains Python: runAstTaint() delegates to the
+// Part 2 analyzer in ast_taint_analyzer/ — a genuine Python AST taint engine
+// with parameter-level source tracking, alias resolution, sanitizer awareness
+// and a frozen severity table.
+//
+// The regex heuristic below is retained for two cases only, and is labelled
+// SIMULATED in the evidence whenever it is the one that ran:
+//   1. non-Python servers (JS/TS), which the Python analyzer cannot parse
+//   2. environments with no usable Python interpreter
+//
+// Keeping it means a missing Python install degrades the scan instead of
+// breaking the marketplace.
 
 const DANGEROUS_SINKS = [
   { pattern: /os\.system\s*\(/, label: 'os.system()' },
@@ -45,12 +55,63 @@ const TAINT_INDICATORS = [
 ];
 
 /**
- * SIMULATED AST taint analyzer.
+ * Dispatcher. Prefers the real Python AST taint analyzer; falls back to the
+ * regex heuristic only when there is no Python to analyse or no interpreter.
+ *
+ * @param {string} code - the candidate's text corpus (markdown + snippets)
+ * @returns {{ score, evidence, fired, engine, hits?, version?, configHash? }}
+ */
+function runAstTaint(code) {
+  const source = astTaint.extractPythonSource(code);
+
+  if (source) {
+    const real = astTaint.analyze(source, RULESET.astSeverityScores);
+    if (real.ok) {
+      const header = `engine: ast-taint v${real.version} (REAL static taint analysis, config ${String(real.configHash).slice(0, 12)}…)`;
+      const body = real.evidence.length > 0
+        ? real.evidence
+        : ['No tainted data flow to dangerous sinks detected in the analysed Python source'];
+      return {
+        score: real.score,
+        evidence: [header, ...body],
+        fired: real.score >= 0.6,
+        engine: 'ast-taint',
+        version: real.version,
+        configHash: real.configHash,
+        hits: real.hits,
+      };
+    }
+    // Python was present but the analyzer could not run — say so, then degrade.
+    const degraded = runAstTaintHeuristic(code);
+    return {
+      ...degraded,
+      engine: 'heuristic-fallback',
+      evidence: [
+        `engine: regex heuristic (SIMULATED) — real analyzer unavailable: ${real.reason}`,
+        ...degraded.evidence,
+      ],
+    };
+  }
+
+  // No Python in the candidate at all (e.g. a TypeScript server).
+  const heuristic = runAstTaintHeuristic(code);
+  return {
+    ...heuristic,
+    engine: 'heuristic',
+    evidence: [
+      'engine: regex heuristic (SIMULATED) — no analysable Python source found in candidate',
+      ...heuristic.evidence,
+    ],
+  };
+}
+
+/**
+ * SIMULATED AST taint analyzer (legacy fallback).
  * Returns deterministic results based on string heuristics.
  * @param {string} code
  * @returns {{ score: number, evidence: string[], fired: boolean }}
  */
-function runAstTaint(code) {
+function runAstTaintHeuristic(code) {
   const evidence = [];
   let maxScore = 0;
 
@@ -244,30 +305,72 @@ function simulateCommitSha(serverId, version, fingerprint) {
  * @param {number} [version=1]
  * @returns {ScanRecord}
  */
-function simulateScan(content, version = 1) {
-  // Build the text corpus for analysis
-  const codeText = [
-    content.long_description || '',
-    (content.tools || []).map(t => t.description || '').join('\n'),
-  ].join('\n');
+async function simulateScan(content, version = 1, onStage = null) {
+  // Stage notifications are for the live UI only. Durations are deliberately
+  // NOT written into the ScanRecord — the signed artifact must stay
+  // byte-identical across runs, and a timestamp would destroy that.
+  const stage = async (name, status, detail) => {
+    // Reserved keys go LAST so a detail field can never clobber them.
+    if (onStage) await onStage({ ...(detail || {}), stage: name, status });
+  };
 
+  const timed = async (name, run, describe) => {
+    await stage(name, 'start');
+    const startedAt = Date.now();
+    const value = await run();
+    await stage(name, 'done', { ms: Date.now() - startedAt, ...(describe ? describe(value) : {}) });
+    return value;
+  };
+
+  await stage('parse', 'start');
+
+  // ── Code view ──────────────────────────────────────────────────────────────
+  // Prefer the real implementation source stored per tool. Only fall back to
+  // scraping markdown when a server predates the source_code column.
+  const toolSources = (content.tools || [])
+    .map(t => (t && t.source_code ? String(t.source_code).trim() : ''))
+    .filter(Boolean);
+
+  const usingRealSource = toolSources.length > 0;
+  const codeText = usingRealSource
+    ? toolSources.join('\n\n\n')
+    : [
+        content.long_description || '',
+        (content.tools || []).map(t => t.description || '').join('\n'),
+      ].join('\n');
+
+  // ── Text view (what Model A reads) ─────────────────────────────────────────
   const descriptionText = [
     content.description || '',
     content.name || '',
     (content.tools || []).map(t => `${t.name}: ${t.description || ''}`).join('\n'),
   ].join('\n');
 
+  await stage('parse', 'done', {
+    codeChars: codeText.length,
+    textChars: descriptionText.length,
+    codeOrigin: usingRealSource ? 'tool_source' : 'markdown',
+    toolCount: (content.tools || []).length,
+    sourcedTools: toolSources.length,
+  });
+
   // ── Run analyzers (Detection Pipeline runs FIRST) ───────────────────────────
-  const astResult = runAstTaint(codeText);
-  const modelBResult = runModelBCode(codeText, astResult.fired);
-  const modelAResult = runModelAText(descriptionText);
+  const astResult = await timed('ast_taint', () => runAstTaint(codeText),
+    v => ({ score: v.score, engine: v.engine, findings: (v.hits || []).length }));
+  const modelBResult = await timed('model_b', () => runModelBCode(codeText, astResult.fired),
+    v => ({ score: v.score }));
+  const modelAResult = await timed('model_a', () => runModelAText(descriptionText),
+    v => ({ score: v.score }));
 
   const analyzers = [
     {
       analyzer: 'AST_TAINT',
-      threat: astResult.evidence.length > 0 ? 'command_injection' : 'none',
+      // Keyed off the score, not evidence length: evidence now always carries
+      // a leading "engine:" line, so counting it would flag every scan.
+      threat: astResult.score > 0 ? 'command_injection' : 'none',
       score: astResult.score,
-      evidence: astResult.evidence.length > 0 ? astResult.evidence : ['No tainted data flow to dangerous sinks detected'],
+      engine: astResult.engine,
+      evidence: astResult.evidence,
     },
     {
       analyzer: 'MODEL_B_CODE',
@@ -284,9 +387,10 @@ function simulateScan(content, version = 1) {
   ];
 
   // ── Policy Engine: Evaluate detection findings ─────────────────────────────
-  const verdict = decideVerdict(analyzers);
+  const verdict = await timed('policy', () => decideVerdict(analyzers), v => ({ verdict: v }));
 
   // ── Conditional Hash Generation: ONLY when detection is CLEAR (PASS) ───────
+  await stage('fingerprint', 'start', { verdict });
   let snapshot;
   let hashesGenerated = false;
 
@@ -330,6 +434,20 @@ function simulateScan(content, version = 1) {
     };
   }
 
+  await stage('fingerprint', 'done', {
+    hashesGenerated,
+    contentFingerprint: snapshot.contentFingerprint,
+    blockedReason: snapshot.blockedReason || null,
+  });
+
+  // When the real analyzer ran, pin the SHA-256 of its detection config rather
+  // than the placeholder. config.py is what decides whether something is a
+  // sink, so that hash is what actually makes this verdict reproducible.
+  const modelVersionHashes = { ...RULESET.modelVersionHashes };
+  if (astResult.engine === 'ast-taint' && astResult.configHash) {
+    modelVersionHashes.AST_TAINT = astResult.configHash;
+  }
+
   return {
     snapshot,
     analyzers,
@@ -337,13 +455,14 @@ function simulateScan(content, version = 1) {
     hashesGenerated,
     policyVersion: RULESET.policyVersion,
     rulesetHash: RULESET_HASH,
-    modelVersionHashes: RULESET.modelVersionHashes,
+    modelVersionHashes,
   };
 }
 
 module.exports = {
   simulateScan,
   runAstTaint,
+  runAstTaintHeuristic,
   runModelBCode,
   runModelAText,
   decideVerdict,

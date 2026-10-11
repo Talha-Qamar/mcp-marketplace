@@ -19,7 +19,9 @@ On first start the server also adds the three MCP Secure demo servers, pre-runs 
 creates a fresh signing key in `database/mcs_key.json`.
 
 Demo accounts created by the seed: `alice_dev`, `bob_builder`, `charlie_ai`, `dave_sec`,
-`anthropic_official`, all with password `password123` (local testing only).
+`anthropic_official`. **Log in with the email, not the username** — the seed sets each one to
+`<username>@example.com` (e.g. `alice_dev@example.com`), and the login route looks users up by
+email. Password for all five is `password123` (local testing only).
 
 ## Not in the repository (on purpose)
 
@@ -48,10 +50,21 @@ generate_*.py, scripts/   scripts used to produce the seed data
 
 ## Where the models plug in
 
-`src/mcpsecure/engine.js` currently uses regex heuristics for the AST taint analyzer, Model A
-(tool-description poisoning) and Model B (code vulnerabilities). The trained models replace these;
-Model B returns a 0-1 score plus evidence lines, with review/fail thresholds 0.40/0.75 from
-`ruleset.json`.
+`src/mcpsecure/engine.js` runs three analyzers. The **AST taint analyzer is real**: `runAstTaint()`
+delegates via `src/mcpsecure/astTaint.js` to the Python engine in `ast_taint_analyzer/` (Part 2),
+which is invoked as a local subprocess — offline, deterministic, and it never executes the code it
+parses. Severity tiers map to the 0-1 policy score through `astSeverityScores` in `ruleset.json`
+(high → 1.0 hard-fail, medium → 0.55 review, low → 0.25). Candidates with no analysable Python
+fall back to the legacy regex heuristic, which is labelled `SIMULATED` in the evidence so the UI
+never overstates what ran.
+
+Model A (tool-description poisoning) and Model B (code vulnerabilities) are still regex heuristics.
+The trained models replace these; Model B returns a 0-1 score plus evidence lines, with review/fail
+thresholds 0.40/0.75 from `ruleset.json`, and consumes the AST analyzer's 16-feature vector
+(`python -m ast_taint feature-names`) as a frozen contract.
+
+The AST analyzer needs Python 3.9+ on `PATH` (or set `MCS_PYTHON` to an interpreter). No `pip
+install` is required — the bridge puts `ast_taint_analyzer/src` on `PYTHONPATH` itself.
 
 ## Known POC shortcuts
 

@@ -37,7 +37,37 @@ async function initDb() {
         saveDb();
     }
 
+    migrate();
+
     return db;
+}
+
+/**
+ * Additive migrations for databases created before a column existed.
+ *
+ * schema.sql uses CREATE TABLE IF NOT EXISTS, so a pre-existing marketplace.db
+ * never picks up new columns on its own. Each ALTER is idempotent by way of the
+ * catch: SQLite throws "duplicate column name" when it has already been applied.
+ */
+function migrate() {
+    const additiveColumns = [
+        `ALTER TABLE tools ADD COLUMN source_code TEXT`,
+        `ALTER TABLE tools ADD COLUMN source_language TEXT`,
+    ];
+
+    let applied = 0;
+    for (const sql of additiveColumns) {
+        try {
+            db.run(sql);
+            applied++;
+        } catch (e) {
+            // Column already present — expected on every boot after the first.
+        }
+    }
+    if (applied > 0) {
+        saveDb();
+        console.log(`[DB] Applied ${applied} additive migration(s).`);
+    }
 }
 
 function getDb() {
