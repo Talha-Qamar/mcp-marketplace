@@ -8,6 +8,25 @@ database/*.db-journal
 # Ed25519 signing key: generated automatically on first start; never commit it
 database/mcs_key.json
 
+# Python build/test artefacts (ast_taint_analyzer)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Analyzer CLI output: regenerate with `python -m ast_taint scan|features ...`
+ast_taint_analyzer/results.json
+ast_taint_analyzer/features.jsonl
+ast_taint_analyzer/safe.json
+ast_taint_analyzer/edge.json
+
+# local planning/context notes, not part of the deliverable
+docs/
+
 # OS / editor / logs
 .DS_Store
 __MACOSX/
