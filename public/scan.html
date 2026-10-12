@@ -122,12 +122,32 @@
         document.getElementById('pipeline-inner').innerHTML = '<div style="text-align:center;padding:3rem;"><span class="mcs-spinner" style="width:2rem;height:2rem;"></span><p style="margin-top:1rem;color:var(--text-3);">Initialising detection pipeline…</p></div>';
 
         try {
-            // Call scan API
-            const result = await MCSAPI.scan(slug);
-            // Animate pipeline
-            await renderPipelineAnimation(document.getElementById('pipeline-inner'), result, () => {
-                document.getElementById('rescan-controls').style.display = 'block';
-            });
+            const inner = document.getElementById('pipeline-inner');
+
+            // Live stage list, driven by real backend events over SSE.
+            const live = createLiveStageView(inner);
+            const result = await streamScan(slug, { onStage: e => live.onStage(e) });
+            live.finish();
+
+            // Everything above already happened for real, so the detailed
+            // replay below runs without the cosmetic per-stage delays.
+            const detail = document.createElement('div');
+            inner.appendChild(detail);
+
+            // Hand the detailed view the real measurements from the stream so
+            // it reports facts instead of inventing them.
+            const facts = {};
+            for (const ev of live.events) {
+                if (ev.status === 'done') facts[ev.stage] = ev;
+            }
+
+            setFastMode(true);
+            try {
+                await renderPipelineAnimation(detail, result, () => {}, facts);
+            } finally {
+                setFastMode(new URLSearchParams(location.search).has('fast'));
+            }
+            document.getElementById('rescan-controls').style.display = 'block';
         } catch (e) {
             document.getElementById('pipeline-inner').innerHTML = `
                 <div class="card" style="border-color:var(--error);text-align:center;padding:2rem;">

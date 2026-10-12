@@ -1,11 +1,42 @@
 {
-  "policyVersion": "policy-v1",
-  "description": "MCP Secure deterministic policy ruleset v1. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility.",
+  "policyVersion": "policy-v3",
+  "description": "MCP Secure deterministic policy ruleset v3. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility. v2 added astSeverityScores (AST taint severity -> 0-1 score). v3 adds modelBPolicy: the real Model B's per-function scores are combined with the AST taint hits before the policy engine sees them.",
   "thresholds": {
     "fail": 0.75,
     "review": 0.4
   },
   "astHardFail": true,
+  "astSeverityScores": {
+    "high": 1.0,
+    "medium": 0.55,
+    "low": 0.25,
+    "none": 0.0
+  },
+  "astSeverityScoresRationale": "high -> 1.0 trips astHardFail (>=0.6) for an immediate FAIL: unsanitized tainted data reaching a shell/exec sink within 2 hops. medium -> 0.55 sits above the review threshold (0.40) but below both the hard-fail gate and the fail threshold, so indirect flows and dynamic/file/deserialize sinks route to the REVIEW tier for human confirmation rather than auto-rejection. low -> 0.25 is a sanitized flow: reported as evidence, never verdict-changing on its own.",
+  "modelBPolicy": {
+    "astCategoryToClass": {
+      "shell": "cmdi",
+      "exec": "codei",
+      "dynamic": "codei",
+      "deserialize": "deser",
+      "file": "path"
+    },
+    "corroboratingSeverities": [
+      "high",
+      "medium"
+    ],
+    "uncorroboratedFailScore": 0.55,
+    "uncorroboratedReviewScore": 0.25,
+    "classThreat": {
+      "cmdi": "command_injection",
+      "path": "path_traversal",
+      "ssrf": "ssrf",
+      "codei": "code_injection",
+      "sqli": "sql_injection",
+      "deser": "unsafe_deserialization"
+    }
+  },
+  "modelBPolicyRationale": "Model B scores one function at a time and cannot see whether tool input reaches the risky call, so on its own it never FAILs a server. A Model B class score keeps its full value (and can reach fail 0.75) only when the AST analyzer reports a medium/high taint flow of the matching category in the same function. Otherwise a fail-level score (>= 0.75) becomes 0.55 (REVIEW, like an AST medium) and a review-level score (0.40-0.75) becomes 0.25 (evidence only, like an AST low). Reason: on 46 real MCP servers, using the raw Model B maximum failed 41/46; requiring AST corroboration for FAIL removes these model-only failures.",
   "analyzers": {
     "AST_TAINT": {
       "weight": 1.0,
@@ -20,7 +51,7 @@
     "MODEL_B_CODE": {
       "weight": 0.9,
       "hardFail": false,
-      "description": "Model B v8: fine-tuned code model (UniXcoder + LoRA) scoring every function for command injection, path traversal, SSRF, code injection, SQL injection and unsafe deserialization. Served by model_b_service/ (set MODEL_B_URL); simulated heuristic when unset."
+      "description": "Model B v8.2: fine-tuned code model (UniXcoder + LoRA) scoring every function for command injection, path traversal, SSRF, code injection, SQL injection and unsafe deserialization. Served by model_b_service/ (set MODEL_B_URL); simulated heuristic when unset. Can FAIL a server only when the AST analyzer corroborates the finding (modelBPolicy)."
     }
   },
   "modelVersionHashes": {

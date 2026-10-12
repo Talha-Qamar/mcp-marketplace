@@ -183,13 +183,193 @@ function realBadge(tooltip = '') {
   return `<span class="mcs-real-badge" title="${tooltip}">REAL CRYPTO</span>`;
 }
 
+function realAnalysisBadge(tooltip = '') {
+  return `<span class="mcs-real-badge" title="${tooltip}">REAL ANALYSIS</span>`;
+}
+
+/**
+ * Badge for one analyzer card, driven by what the backend reports it ran.
+ * Never hardcode this — the whole point is that the label tracks reality.
+ */
+function analyzerBadge(a) {
+  if (a.engine === 'ast-taint') {
+    return realAnalysisBadge(
+      'Real Python AST taint analysis (ast_taint). Parsed, never executed. ' +
+      'Parameter-level taint tracking with alias resolution and a frozen severity table.'
+    );
+  }
+  if (a.engine === 'heuristic-fallback') {
+    return simBadge(
+      'Degraded: the real analyzer could not run, so this fell back to the regex ' +
+      'heuristic. The reason is the first line of the evidence below.'
+    );
+  }
+  if (a.engine === 'heuristic') {
+    return simBadge('No analysable Python source in this candidate — regex heuristic only.');
+  }
+  return simBadge('In production: fine-tuned ML model. Here: deterministic heuristics.');
+}
+
+function astEngineOf(analyzers) {
+  const ast = (analyzers || []).find(a => a.analyzer === 'AST_TAINT');
+  return ast ? ast.engine : undefined;
+}
+
+function setFastMode(value) {
+  FAST_MODE = !!value;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live pipeline — real backend stages over SSE.
+//
+// The stage list below is populated by events the server emits as each stage
+// ACTUALLY finishes, carrying its measured duration. Nothing here is on a
+// timer. (The detailed cards that render afterwards are a replay of results
+// that already exist by then, which is why their fake delays are switched off.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STAGE_LABELS = {
+  parse: 'Parse source & extract tool views',
+  ast_taint: 'AST Taint Analysis',
+  model_b: 'Model B — code obfuscation',
+  model_a: 'Model A — text poisoning / PMA',
+  policy: 'Deterministic policy engine',
+  fingerprint: 'Fingerprint & commit pin',
+  attest: 'Ed25519 attestation',
+  log: 'Merkle transparency log',
+  anchor: 'Chain anchor',
+  blocked: 'Blockchain storage blocked',
+};
+
+function stageDetailText(e) {
+  const bits = [];
+  if (e.codeOrigin) {
+    bits.push(e.codeOrigin === 'tool_source'
+      ? `${e.sourcedTools}/${e.toolCount} tools from stored source`
+      : 'markdown fallback (no stored source)');
+  }
+  if (e.codeChars !== undefined) bits.push(`code ${e.codeChars}c · text ${e.textChars}c`);
+  if (e.engine) bits.push(`engine: ${e.engine}`);
+  if (e.findings !== undefined) bits.push(`${e.findings} finding(s)`);
+  if (e.score !== undefined) bits.push(`score ${(e.score * 100).toFixed(0)}%`);
+  if (e.verdict && e.status === 'done') bits.push(`→ ${e.verdict}`);
+  if (e.contentFingerprint) bits.push(`fp ${String(e.contentFingerprint).slice(0, 16)}…`);
+  if (e.hashesGenerated === false) bits.push('hashes withheld');
+  if (e.attestationId) bits.push(String(e.attestationId).slice(0, 18) + '…');
+  if (e.logIndex !== undefined) bits.push(`leaf #${e.logIndex}`);
+  if (e.blockNumber !== undefined) bits.push(`block #${e.blockNumber}`);
+  if (e.attestationStatus) bits.push(e.attestationStatus);
+  if (e.reason) bits.push(e.reason);
+  return bits.join(' · ');
+}
+
+function createLiveStageView(container) {
+  const events = [];
+  container.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <h3 style="margin:0;font-size:1rem;">Live pipeline ${realBadge('Stages stream from the backend as they complete. Durations are measured, not scripted.')}</h3>
+        <span id="mcs-live-total" style="font-family:var(--font-mono);color:var(--text-3);font-size:0.8125rem;"></span>
+      </div>
+      <ul id="mcs-live-list" style="list-style:none;padding:0;margin:1rem 0 0;"></ul>
+    </div>`;
+
+  const list = container.querySelector('#mcs-live-list');
+  const totalEl = container.querySelector('#mcs-live-total');
+  const started = Date.now();
+  let measured = 0;
+
+  return {
+    events,
+    onStage(e) {
+      events.push(e);
+      const id = 'mcs-live-' + e.stage;
+      let row = document.getElementById(id);
+      if (!row) {
+        // Two rows, not one: a long detail string on the same flex line
+        // collapses the label to a single character per line.
+        row = document.createElement('li');
+        row.id = id;
+        row.style.cssText = 'padding:0.45rem 0;border-bottom:1px solid var(--border);font-size:0.875rem;';
+        row.innerHTML = `
+          <div style="display:flex;align-items:baseline;gap:0.75rem;">
+            <span class="live-icon" style="flex:0 0 1.25rem;color:var(--text-3);">⋯</span>
+            <span style="flex:1 1 auto;min-width:0;">${escapeHtml(STAGE_LABELS[e.stage] || e.stage)}</span>
+            <span class="live-ms" style="flex:0 0 auto;font-family:var(--font-mono);color:var(--text-3);min-width:4.5rem;text-align:right;"></span>
+          </div>
+          <div class="live-detail" style="margin-left:2rem;color:var(--text-3);font-family:var(--font-mono);font-size:0.7rem;line-height:1.5;overflow-wrap:anywhere;"></div>`;
+        list.appendChild(row);
+      }
+      if (e.status === 'done') {
+        row.querySelector('.live-icon').textContent = '✓';
+        row.querySelector('.live-icon').style.color = 'var(--success)';
+        row.querySelector('.live-detail').textContent = stageDetailText(e);
+        if (typeof e.ms === 'number') {
+          row.querySelector('.live-ms').textContent = `${e.ms} ms`;
+          measured += e.ms;
+        }
+      }
+      totalEl.textContent = `${Date.now() - started} ms elapsed · ${measured} ms in-stage`;
+    },
+    finish() {
+      totalEl.textContent = `${Date.now() - started} ms wall · ${measured} ms measured in-stage`;
+    },
+  };
+}
+
+/**
+ * Run a scan with live stage streaming.
+ * Falls back to the plain POST endpoint when EventSource is unavailable.
+ */
+function streamScan(slug, options = {}) {
+  const { baitAndSwitch = false, onStage, onBegin } = options;
+
+  return new Promise((resolve, reject) => {
+    if (typeof EventSource === 'undefined') {
+      fetch('/api/mcs/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverSlug: slug, baitAndSwitch }),
+      }).then(r => r.json().then(j => (r.ok ? resolve(j) : reject(new Error(j.error || r.statusText)))))
+        .catch(reject);
+      return;
+    }
+
+    const params = new URLSearchParams({ serverSlug: slug });
+    if (baitAndSwitch) params.set('baitAndSwitch', 'true');
+    const es = new EventSource('/api/mcs/scan/stream?' + params.toString());
+    let settled = false;
+
+    const fail = (message) => {
+      if (settled) return;
+      settled = true;
+      es.close();
+      reject(new Error(message));
+    };
+
+    es.addEventListener('begin', ev => { if (onBegin) onBegin(JSON.parse(ev.data)); });
+    es.addEventListener('stage', ev => { if (onStage) onStage(JSON.parse(ev.data)); });
+    es.addEventListener('result', ev => {
+      settled = true;
+      es.close();
+      resolve(JSON.parse(ev.data));
+    });
+    es.addEventListener('error', ev => {
+      let message = 'Scan stream failed';
+      try { if (ev.data) message = JSON.parse(ev.data).error || message; } catch (_) { /* native error */ }
+      fail(message);
+    });
+    es.onerror = () => fail('Connection to scan stream lost');
+  });
+}
+
 /**
  * Render the animated pipeline view into a container element.
  * @param {HTMLElement} container
  * @param {object} scanResult - from /api/mcs/scan
  * @param {Function} onComplete - called after all stages animate
  */
-async function renderPipelineAnimation(container, scanResult, onComplete) {
+async function renderPipelineAnimation(container, scanResult, onComplete, liveFacts = null) {
   const { scanRecord, attestation } = scanResult;
   const { snapshot, analyzers, verdict, policyVersion, rulesetHash } = scanRecord;
 
@@ -210,7 +390,9 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
       <div class="mcs-stage mcs-stage-pending" id="stage-parse">
         <div class="mcs-stage-icon">📄</div>
         <div class="mcs-stage-body">
-          <div class="mcs-stage-title">Step 1: Parse AST &amp; Extract Tools ${simBadge('AST parser & tool interface extraction')}</div>
+          <div class="mcs-stage-title">Step 1: Parse AST &amp; Extract Tools ${astEngineOf(analyzers) === 'ast-taint'
+            ? realAnalysisBadge('Real Python ast.parse() — tool functions extracted from the parsed tree')
+            : simBadge('AST parser & tool interface extraction')}</div>
           <div class="mcs-stage-content" id="parse-content"></div>
         </div>
         <div class="mcs-stage-spinner" id="parse-spinner"></div>
@@ -325,11 +507,19 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
   // ── 1. Animate: Parse AST ────────────────────────────────────────────────
   stageStart('stage-parse');
   await stageDelay(STAGE_DELAY);
+  // Real measurements from the backend's parse stage when we have them.
+  // This used to invent both numbers (one of them with Math.random), which
+  // made the panel non-deterministic and simply untrue.
+  const parseFacts = liveFacts && liveFacts.parse;
   document.getElementById('parse-content').innerHTML = `
     <div style="color:var(--text-2);font-size:0.875rem;">
-      Extracted code AST (long_description + tool functions) and natural language text (metadata + descriptions).
-      <br>Code view length: <strong style="color:var(--text-1)">${(scanRecord.snapshot.repoRef || '').length + 220} chars</strong> |
-      Text view length: <strong style="color:var(--text-1)">${Math.floor(Math.random() * 150) + 380} chars</strong>
+      ${parseFacts && parseFacts.codeOrigin === 'tool_source'
+        ? `Parsed <strong style="color:var(--text-1)">${parseFacts.sourcedTools}/${parseFacts.toolCount}</strong> tool implementation(s) from stored source, plus the natural-language view (metadata + descriptions).`
+        : 'Extracted the code view (tool source, or implementation snippets scraped from the description) and the natural-language text view (metadata + descriptions).'}
+      ${parseFacts
+        ? `<br>Code view length: <strong style="color:var(--text-1)">${parseFacts.codeChars} chars</strong> |
+           Text view length: <strong style="color:var(--text-1)">${parseFacts.textChars} chars</strong>`
+        : ''}
     </div>
   `;
   stageDone('stage-parse');
@@ -350,7 +540,7 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
     <div class="mcs-analyzer-card" id="ac-${a.analyzer}">
       <div class="mcs-analyzer-header">
         <span class="mcs-analyzer-name" style="color:${info.color}">${info.label || a.analyzer}</span>
-        ${simBadge(`In production: fine-tuned ML model. Here: deterministic heuristics.`)}
+        ${analyzerBadge(a)}
         <span class="mcs-analyzer-sub">${info.sublabel || ''}</span>
       </div>
       <div class="mcs-analyzer-body">
@@ -367,7 +557,10 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
     if (!card) continue;
 
     const threatColor = a.score >= 0.75 ? 'var(--error)' : a.score >= 0.40 ? 'var(--warning)' : 'var(--success)';
-    const hasIssues = a.evidence.some(e => !e.startsWith('No '));
+    // Driven by the analyzer's own score/threat, not by string-matching the
+    // evidence: evidence lines now include an "engine:" header, and a clean
+    // scan must not be labelled "Flags Found" just because that line exists.
+    const hasIssues = a.score > 0 || (a.threat && a.threat !== 'none');
 
     card.querySelector('.mcs-analyzer-body').innerHTML = `
       <div class="mcs-score-row">
@@ -1370,6 +1563,7 @@ const MCSViews = (() => {
         <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;font-size:0.75rem;">
           <span class="mcs-sim-badge">SIMULATED (POC)</span> = deterministic mock of future ML/chain component
           <span class="mcs-real-badge">REAL CRYPTO</span> = genuine SHA-256, Ed25519, Merkle proof
+          <span class="mcs-real-badge">REAL ANALYSIS</span> = genuine Python AST taint analysis (never executed)
         </div>
       </div>
     `;
@@ -1410,9 +1604,14 @@ window.MCSVerify = MCSVerify;
 window.MCSWatcher = MCSWatcher;
 window.MCSVerifier = MCSVerifier;
 window.renderPipelineAnimation = renderPipelineAnimation;
+window.createLiveStageView = createLiveStageView;
+window.streamScan = streamScan;
+window.setFastMode = setFastMode;
 window.verdictBadge = verdictBadge;
 window.simBadge = simBadge;
 window.realBadge = realBadge;
+window.realAnalysisBadge = realAnalysisBadge;
+window.analyzerBadge = analyzerBadge;
 window.escapeHtml = escapeHtml;
 window.stageDelay = stageDelay;
 window.FAST_MODE = FAST_MODE;

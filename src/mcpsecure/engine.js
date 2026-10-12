@@ -1,18 +1,20 @@
 /**
  * MCP Secure — Deterministic Scan Engine
  * =======================================
- * SIMULATED (POC): The three analyzer "models" are deterministic heuristics.
- * They produce the same output for the same input every time.
- * In production these would be fine-tuned ML models (LoRA adapters) running
- * offline inference. The policy engine logic is identical to production intent.
+ * AST taint is the real Part 2 analyzer (Python, regex fallback otherwise).
+ * Model B is the real trained classifier when MODEL_B_URL is set (simulated
+ * heuristic otherwise); its findings are combined with the AST hits under
+ * ruleset.modelBPolicy. Model A is still a deterministic heuristic.
+ * The policy engine logic is identical to production intent.
  *
- * simulateScan(content) → ScanRecord
+ * simulateScan(content) → ScanRecord   (name kept for existing callers)
  *
  * Heuristics are VISIBLE and TRANSPARENT — the UI shows exactly WHY
  * a verdict was reached via the evidence[] arrays.
  */
 
 const mcscrpyto = require('./crypto');
+const astTaint = require('./astTaint');
 const path = require('path');
 const fs = require('fs');
 
@@ -22,9 +24,18 @@ const RULESET = JSON.parse(fs.readFileSync(RULESET_PATH, 'utf8'));
 const RULESET_HASH = mcscrpyto.sha256hex(fs.readFileSync(RULESET_PATH, 'utf8'));
 
 // ─── Analyzer 1: AST Taint (command injection — hard signal) ──────────────────
-// SIMULATED (POC): In production this runs a real AST parser (tree-sitter or
-// python-ast) and performs inter-procedural taint tracking to check if
-// attacker-controlled data reaches dangerous sinks.
+// REAL when the candidate contains Python: runAstTaint() delegates to the
+// Part 2 analyzer in ast_taint_analyzer/ — a genuine Python AST taint engine
+// with parameter-level source tracking, alias resolution, sanitizer awareness
+// and a frozen severity table.
+//
+// The regex heuristic below is retained for two cases only, and is labelled
+// SIMULATED in the evidence whenever it is the one that ran:
+//   1. non-Python servers (JS/TS), which the Python analyzer cannot parse
+//   2. environments with no usable Python interpreter
+//
+// Keeping it means a missing Python install degrades the scan instead of
+// breaking the marketplace.
 
 const DANGEROUS_SINKS = [
   { pattern: /os\.system\s*\(/, label: 'os.system()' },
@@ -45,12 +56,63 @@ const TAINT_INDICATORS = [
 ];
 
 /**
- * SIMULATED AST taint analyzer.
+ * Dispatcher. Prefers the real Python AST taint analyzer; falls back to the
+ * regex heuristic only when there is no Python to analyse or no interpreter.
+ *
+ * @param {string} code - the candidate's text corpus (markdown + snippets)
+ * @returns {{ score, evidence, fired, engine, hits?, version?, configHash? }}
+ */
+function runAstTaint(code) {
+  const source = astTaint.extractPythonSource(code);
+
+  if (source) {
+    const real = astTaint.analyze(source, RULESET.astSeverityScores);
+    if (real.ok) {
+      const header = `engine: ast-taint v${real.version} (REAL static taint analysis, config ${String(real.configHash).slice(0, 12)}…)`;
+      const body = real.evidence.length > 0
+        ? real.evidence
+        : ['No tainted data flow to dangerous sinks detected in the analysed Python source'];
+      return {
+        score: real.score,
+        evidence: [header, ...body],
+        fired: real.score >= 0.6,
+        engine: 'ast-taint',
+        version: real.version,
+        configHash: real.configHash,
+        hits: real.hits,
+      };
+    }
+    // Python was present but the analyzer could not run — say so, then degrade.
+    const degraded = runAstTaintHeuristic(code);
+    return {
+      ...degraded,
+      engine: 'heuristic-fallback',
+      evidence: [
+        `engine: regex heuristic (SIMULATED) — real analyzer unavailable: ${real.reason}`,
+        ...degraded.evidence,
+      ],
+    };
+  }
+
+  // No Python in the candidate at all (e.g. a TypeScript server).
+  const heuristic = runAstTaintHeuristic(code);
+  return {
+    ...heuristic,
+    engine: 'heuristic',
+    evidence: [
+      'engine: regex heuristic (SIMULATED) — no analysable Python source found in candidate',
+      ...heuristic.evidence,
+    ],
+  };
+}
+
+/**
+ * SIMULATED AST taint analyzer (legacy fallback).
  * Returns deterministic results based on string heuristics.
  * @param {string} code
  * @returns {{ score: number, evidence: string[], fired: boolean }}
  */
-function runAstTaint(code) {
+function runAstTaintHeuristic(code) {
   const evidence = [];
   let maxScore = 0;
 
@@ -130,42 +192,102 @@ function runModelBCode(code, astFired) {
 // When MODEL_B_URL is set (e.g. http://127.0.0.1:8765, started with
 // `python model_b_service/serve.py`), the trained Model B v8 classifier
 // (UniXcoder + LoRA; command injection, path traversal, SSRF, code injection,
-// SQL injection, unsafe deserialization) scores the code blocks in the server
-// description and, when github_url is a real public repo, the repo's source.
+// SQL injection, unsafe deserialization) scores every function in the tools'
+// source code (or, for older rows without source, the code blocks in the
+// description) and, when github_url is a real public repo, the repo's source.
 // Fail-closed: if the service is configured but unreachable, the result is
 // REVIEW, never a silent PASS.
 
 const MODEL_B_URL = process.env.MODEL_B_URL || '';
 const MODEL_B_TIMEOUT_MS = Number(process.env.MODEL_B_TIMEOUT_MS || 600000);
+const SOURCE_EXT = { python: '.py', typescript: '.ts', javascript: '.js' };
 
 /**
  * @param {object} content
- * @returns {Promise<{ score: number, evidence: string[], threat: string, modelHash: string|null }>}
+ * @returns {Promise<{ ok: boolean, findings?: object[], nFunctions?: number, notes: string[], modelHash: string|null, error?: string }>}
  */
 async function runModelBService(content) {
+  const files = (content.tools || [])
+    .filter(t => t && t.source_code)
+    .map((t, i) => ({
+      path: `tools/${i}_${String(t.name || 'tool').replace(/[^\w.-]/g, '_')}${SOURCE_EXT[t.source_language] || '.py'}`,
+      content: String(t.source_code),
+    }));
+  const body = { github_url: content.github_url || undefined };
+  if (files.length > 0) body.files = files;
+  else body.markdown = content.long_description || '';
   try {
     const res = await fetch(`${MODEL_B_URL.replace(/\/$/, '')}/scan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ markdown: content.long_description || '', github_url: content.github_url || undefined }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(MODEL_B_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const r = await res.json();
-    const evidence = r.evidence.length > 0 ? [...r.evidence]
-      : [`No vulnerable code patterns detected (${r.n_functions} functions scanned)`];
-    for (const s of r.sources || []) {
-      if (s.startsWith('github unavailable')) evidence.push(`note: ${s}`);
-    }
-    return { score: r.score, evidence, threat: r.threat, modelHash: r.model_hash };
+    const notes = (r.sources || []).filter(s => s.startsWith('github unavailable')).map(s => `note: ${s}`);
+    return { ok: true, findings: r.findings || [], nFunctions: r.n_functions, notes, modelHash: r.model_hash };
   } catch (e) {
+    return { ok: false, error: e.message, notes: [], modelHash: null };
+  }
+}
+
+/**
+ * Turn Model B's per-function findings into the analyzer score, using the AST
+ * taint hits as corroboration (ruleset.modelBPolicy).
+ *
+ * Model B reads one function at a time and cannot see whether tool input
+ * reaches the risky call, so on its own it may send a server to REVIEW but
+ * never FAIL it. A finding keeps its full score (and can FAIL) only when the
+ * AST analyzer reports a medium/high flow of the matching category in the
+ * same function.
+ *
+ * @param {object} svc - runModelBService() result
+ * @param {object} astResult - runAstTaint() result
+ * @returns {{ score: number, threat: string, evidence: string[], corroborated: number }}
+ */
+function fuseModelB(svc, astResult) {
+  const policy = RULESET.modelBPolicy;
+  const { fail, review } = RULESET.thresholds;
+  if (!svc.ok) {
     return {
-      score: RULESET.thresholds.review,
-      evidence: [`Model B service unavailable (${e.message}); manual review required`],
+      score: review,
       threat: 'scanner_unavailable',
-      modelHash: null,
+      evidence: [`Model B service unavailable (${svc.error}); manual review required`],
+      corroborated: 0,
     };
   }
+  const hits = astResult.engine === 'ast-taint' ? (astResult.hits || []) : [];
+  const confirms = (func, cls) => hits.some(h => h.tool === func
+    && policy.astCategoryToClass[h.category] === cls
+    && policy.corroboratingSeverities.includes(String(h.severity).toLowerCase()));
+
+  let best = { score: 0, threat: 'none' };
+  const lines = [];
+  let corroborated = 0;
+  for (const f of svc.findings) {
+    for (const [cls, s] of Object.entries(f.calibrated || {})) {
+      if (s < review) continue;
+      const ok = confirms(f.func_name, cls);
+      const eff = ok ? s : (s >= fail ? policy.uncorroboratedFailScore : policy.uncorroboratedReviewScore);
+      const threat = policy.classThreat[cls] || cls;
+      if (ok) corroborated += 1;
+      lines.push({
+        eff,
+        text: `${threat} in ${f.func_name}() at ${f.file}:${f.start_line} — model ${s.toFixed(2)}`
+          + (ok ? ' [corroborated by AST taint flow → full score]'
+            : s >= fail ? ' [no AST taint flow in this function → review]' : ' [below fail, no AST flow → evidence only]'),
+      });
+      if (eff > best.score) best = { score: eff, threat };
+    }
+  }
+  lines.sort((a, b) => b.eff - a.eff);
+  const evidence = [
+    `engine: Model B v8 (REAL, ${svc.nFunctions} functions scanned, model ${String(svc.modelHash).slice(0, 12)}…)`,
+    ...(lines.length > 0 ? lines.slice(0, 10).map(l => l.text) : ['No vulnerable code patterns detected']),
+    ...svc.notes,
+  ];
+  return { score: parseFloat(best.score.toFixed(3)), threat: best.threat, evidence, corroborated };
 }
 
 // ─── Analyzer 3: Model A Text (tool poisoning + PMA) ──────────────────────────
@@ -286,51 +408,83 @@ function simulateCommitSha(serverId, version, fingerprint) {
  * @param {number} [version=1]
  * @returns {ScanRecord}
  */
-function simulateScan(content, version = 1) {
-  return buildScanRecord(content, version, null);
-}
+async function simulateScan(content, version = 1, onStage = null) {
+  // Stage notifications are for the live UI only. Durations are deliberately
+  // NOT written into the ScanRecord — the signed artifact must stay
+  // byte-identical across runs, and a timestamp would destroy that.
+  const stage = async (name, status, detail) => {
+    // Reserved keys go LAST so a detail field can never clobber them.
+    if (onStage) await onStage({ ...(detail || {}), stage: name, status });
+  };
 
-/**
- * Scan with the real Model B when MODEL_B_URL is set; otherwise identical to simulateScan().
- * @param {object} content
- * @param {number} [version=1]
- * @returns {Promise<ScanRecord>}
- */
-async function runScan(content, version = 1) {
-  if (!MODEL_B_URL) return simulateScan(content, version);
-  return buildScanRecord(content, version, await runModelBService(content));
-}
+  const timed = async (name, run, describe) => {
+    await stage(name, 'start');
+    const startedAt = Date.now();
+    const value = await run();
+    await stage(name, 'done', { ms: Date.now() - startedAt, ...(describe ? describe(value) : {}) });
+    return value;
+  };
 
-function buildScanRecord(content, version, realModelB) {
-  // Build the text corpus for analysis
-  const codeText = [
-    content.long_description || '',
-    (content.tools || []).map(t => t.description || '').join('\n'),
-  ].join('\n');
+  await stage('parse', 'start');
 
+  // ── Code view ──────────────────────────────────────────────────────────────
+  // Prefer the real implementation source stored per tool. Only fall back to
+  // scraping markdown when a server predates the source_code column.
+  const toolSources = (content.tools || [])
+    .map(t => (t && t.source_code ? String(t.source_code).trim() : ''))
+    .filter(Boolean);
+
+  const usingRealSource = toolSources.length > 0;
+  const codeText = usingRealSource
+    ? toolSources.join('\n\n\n')
+    : [
+        content.long_description || '',
+        (content.tools || []).map(t => t.description || '').join('\n'),
+      ].join('\n');
+
+  // ── Text view (what Model A reads) ─────────────────────────────────────────
   const descriptionText = [
     content.description || '',
     content.name || '',
     (content.tools || []).map(t => `${t.name}: ${t.description || ''}`).join('\n'),
   ].join('\n');
 
+  await stage('parse', 'done', {
+    codeChars: codeText.length,
+    textChars: descriptionText.length,
+    codeOrigin: usingRealSource ? 'tool_source' : 'markdown',
+    toolCount: (content.tools || []).length,
+    sourcedTools: toolSources.length,
+  });
+
   // ── Run analyzers (Detection Pipeline runs FIRST) ───────────────────────────
-  const astResult = runAstTaint(codeText);
-  const modelBResult = realModelB || runModelBCode(codeText, astResult.fired);
-  const modelAResult = runModelAText(descriptionText);
+  const astResult = await timed('ast_taint', () => runAstTaint(codeText),
+    v => ({ score: v.score, engine: v.engine, findings: (v.hits || []).length }));
+  let realModelB = null;
+  const modelBResult = await timed('model_b', async () => {
+    if (!MODEL_B_URL) return runModelBCode(codeText, astResult.fired);
+    realModelB = await runModelBService(content);
+    return fuseModelB(realModelB, astResult);
+  }, v => ({ score: v.score, engine: realModelB ? 'model-b-v8' : 'simulated' }));
+  const modelAResult = await timed('model_a', () => runModelAText(descriptionText),
+    v => ({ score: v.score }));
 
   const analyzers = [
     {
       analyzer: 'AST_TAINT',
-      threat: astResult.evidence.length > 0 ? 'command_injection' : 'none',
+      // Keyed off the score, not evidence length: evidence now always carries
+      // a leading "engine:" line, so counting it would flag every scan.
+      threat: astResult.score > 0 ? 'command_injection' : 'none',
       score: astResult.score,
-      evidence: astResult.evidence.length > 0 ? astResult.evidence : ['No tainted data flow to dangerous sinks detected'],
+      engine: astResult.engine,
+      evidence: astResult.evidence,
     },
     {
       analyzer: 'MODEL_B_CODE',
-      threat: realModelB ? realModelB.threat
+      threat: realModelB ? (modelBResult.score >= RULESET.thresholds.review ? modelBResult.threat : 'none')
         : (modelBResult.score >= RULESET.thresholds.review ? 'command_injection' : 'none'),
       score: modelBResult.score,
+      engine: realModelB ? 'model-b-v8' : 'simulated',
       evidence: modelBResult.evidence.length > 0 ? modelBResult.evidence : ['No obfuscation or injection patterns detected in code'],
     },
     {
@@ -342,9 +496,10 @@ function buildScanRecord(content, version, realModelB) {
   ];
 
   // ── Policy Engine: Evaluate detection findings ─────────────────────────────
-  const verdict = decideVerdict(analyzers);
+  const verdict = await timed('policy', () => decideVerdict(analyzers), v => ({ verdict: v }));
 
   // ── Conditional Hash Generation: ONLY when detection is CLEAR (PASS) ───────
+  await stage('fingerprint', 'start', { verdict });
   let snapshot;
   let hashesGenerated = false;
 
@@ -388,6 +543,23 @@ function buildScanRecord(content, version, realModelB) {
     };
   }
 
+  await stage('fingerprint', 'done', {
+    hashesGenerated,
+    contentFingerprint: snapshot.contentFingerprint,
+    blockedReason: snapshot.blockedReason || null,
+  });
+
+  // When the real analyzer ran, pin the SHA-256 of its detection config rather
+  // than the placeholder. config.py is what decides whether something is a
+  // sink, so that hash is what actually makes this verdict reproducible.
+  const modelVersionHashes = { ...RULESET.modelVersionHashes };
+  if (astResult.engine === 'ast-taint' && astResult.configHash) {
+    modelVersionHashes.AST_TAINT = astResult.configHash;
+  }
+  if (realModelB && realModelB.modelHash) {
+    modelVersionHashes.MODEL_B_CODE = realModelB.modelHash;
+  }
+
   return {
     snapshot,
     analyzers,
@@ -395,19 +567,17 @@ function buildScanRecord(content, version, realModelB) {
     hashesGenerated,
     policyVersion: RULESET.policyVersion,
     rulesetHash: RULESET_HASH,
-    modelVersionHashes: realModelB && realModelB.modelHash
-      ? { ...RULESET.modelVersionHashes, MODEL_B_CODE: realModelB.modelHash }
-      : RULESET.modelVersionHashes,
-    modelBMode: realModelB ? 'model-b-v8' : 'simulated',
+    modelVersionHashes,
   };
 }
 
 module.exports = {
   simulateScan,
-  runScan,
-  runModelBService,
   runAstTaint,
+  runAstTaintHeuristic,
   runModelBCode,
+  runModelBService,
+  fuseModelB,
   runModelAText,
   decideVerdict,
   RULESET,

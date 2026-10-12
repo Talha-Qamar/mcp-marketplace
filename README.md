@@ -19,7 +19,9 @@ On first start the server also adds the three MCP Secure demo servers, pre-runs 
 creates a fresh signing key in `database/mcs_key.json`.
 
 Demo accounts created by the seed: `alice_dev`, `bob_builder`, `charlie_ai`, `dave_sec`,
-`anthropic_official`, all with password `password123` (local testing only).
+`anthropic_official`. **Log in with the email, not the username** — the seed sets each one to
+`<username>@example.com` (e.g. `alice_dev@example.com`), and the login route looks users up by
+email. Password for all five is `password123` (local testing only).
 
 ## Not in the repository (on purpose)
 
@@ -53,9 +55,18 @@ generate_*.py, scripts/   scripts used to produce the seed data
 
 | Analyzer | Status |
 |---|---|
-| **Model B** (code vulnerabilities) | **Real.** The trained classifier runs as a local service in `model_b_service/` (see its README and `MODEL_CARD.md`). |
-| AST taint | Regex heuristic for now; the teammate's analyzer replaces it. |
+| **AST taint** | **Real.** `runAstTaint()` delegates via `src/mcpsecure/astTaint.js` to the Python engine in `ast_taint_analyzer/` (Part 2), a local subprocess: offline, deterministic, never executes the code. Severity → score via `astSeverityScores` (high 1.0 hard-fail, medium 0.55 review, low 0.25). Non-Python candidates fall back to the regex heuristic, labelled `SIMULATED` in the evidence. |
+| **Model B** (code vulnerabilities) | **Real** when `MODEL_B_URL` is set. The trained classifier (`model_b_service/`, see its README and `MODEL_CARD.md`) scores every function of the tools' source and the GitHub repo for six classes. |
 | Model A (tool poisoning / PMA) | Regex heuristic for now. |
+
+**How Model B and the AST analyzer combine** (`modelBPolicy` in `ruleset.json`): Model B reads one
+function at a time and cannot see whether tool input reaches the risky call, so on its own it can
+send a server to REVIEW but never FAIL it. A Model B finding keeps its full score, and can FAIL the
+server, only when the AST analyzer reports a medium/high taint flow of the matching category in the
+same function (shell → command injection, exec/dynamic → code injection, file → path traversal,
+deserialize → unsafe deserialization). Without corroboration a fail-level Model B score counts as
+0.55 (REVIEW) and a review-level one as 0.25 (evidence only). Model B does not consume the AST
+feature vector; the two are combined here, at the policy layer.
 
 To use the real Model B, start the service and run the marketplace with `MODEL_B_URL`:
 
@@ -65,8 +76,10 @@ python serve.py --port 8765                  # first start downloads the base mo
 cd .. && MODEL_B_URL=http://127.0.0.1:8765 npm start
 ```
 
-- Without `MODEL_B_URL`, the old Model B heuristic runs, and scan records say `modelBMode: "simulated"`.
-- If the service is configured but down, scans go to REVIEW.
+- Without `MODEL_B_URL`, the old Model B heuristic runs and the analyzer card says `simulated`.
+- If the service is configured but down, Model B scores 0.40 and the scan goes to REVIEW.
+- The AST analyzer needs Python 3.9+ on `PATH` (or set `MCS_PYTHON`). No `pip install` is needed:
+  the bridge puts `ast_taint_analyzer/src` on `PYTHONPATH` itself.
 
 ## Known POC shortcuts
 

@@ -76,13 +76,18 @@ Start the service, then the marketplace with `MODEL_B_URL`:
 MODEL_B_URL=http://127.0.0.1:8765 npm start
 ```
 
-`../src/mcpsecure/engine.js` → `runScan()` sends each server's description, and its `github_url`
-when that is a real public repo, to `/scan`. Model B's score enters the policy engine as
-`MODEL_B_CODE`, and the scan record stores the service's model hash.
+`../src/mcpsecure/engine.js` → `simulateScan()` sends each server's tool source code (or, for
+older rows without source, the code blocks in its description), plus its `github_url` when that is
+a real public repo, to `/scan`. The scan record stores the service's model hash.
 
-- Without `MODEL_B_URL`, the old simulated heuristic runs, and the record says
-  `modelBMode: "simulated"`.
-- If the service is configured but unreachable, the result is **REVIEW**, never a silent PASS.
+`score` / `verdict_hint` above are Model B on its own. The marketplace does not use them directly:
+`fuseModelB()` combines the per-function `findings` with the AST taint analyzer's hits
+(`ruleset.json` → `modelBPolicy`). A finding can FAIL a server only when the AST analyzer reports a
+matching taint flow in the same function; otherwise Model B can raise the server to REVIEW at most.
+See `MODEL_CARD.md` for why.
+
+- Without `MODEL_B_URL`, the old simulated heuristic runs, and the analyzer card says `simulated`.
+- If the service is configured but unreachable, Model B scores 0.40 (**REVIEW**), never a silent PASS.
 
 ## Releasing a new model
 

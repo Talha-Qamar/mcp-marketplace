@@ -4,8 +4,8 @@ Install a trained Model B into the service and register it with the marketplace.
 
   1. copies the model files from a Kaggle output folder into model_b_v8/;
   2. runs parity_check.py: local CPU scores must match the Kaggle scores on the test sets;
-  3. writes the model hash into the marketplace ruleset (modelVersionHashes.MODEL_B_CODE) and
-     updates the MODEL_B_CODE description.
+  3. writes the model hash into the marketplace ruleset (modelVersionHashes.MODEL_B_CODE); the
+     MODEL_B_CODE description is only filled in when the ruleset has none.
 
 Usage: python release.py <kaggle-output-dir> [--ruleset ../src/mcpsecure/ruleset.json]
 """
@@ -47,10 +47,10 @@ def main():
     rs_path = Path(a.ruleset)
     rs = json.loads(rs_path.read_text())
     rs["modelVersionHashes"]["MODEL_B_CODE"] = h
-    rs["analyzers"]["MODEL_B_CODE"]["description"] = (
+    rs["analyzers"]["MODEL_B_CODE"].setdefault("description", (
         "Model B v8: fine-tuned code model (UniXcoder + LoRA) scoring every function for command "
         "injection, path traversal, SSRF, code injection, SQL injection and unsafe deserialization. "
-        "Served by model_b_service/ (set MODEL_B_URL); simulated heuristic when unset.")
+        "Served by model_b_service/ (set MODEL_B_URL); simulated heuristic when unset."))   # keeps an edited description
     rs_path.write_text(json.dumps(rs, indent=2) + "\n")
     print(f"MODEL_B_CODE hash {h} -> {rs_path}")
 
