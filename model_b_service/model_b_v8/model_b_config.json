@@ -1,0 +1,53 @@
+{
+ "classes": [
+  "cmdi",
+  "path",
+  "ssrf",
+  "codei",
+  "sqli",
+  "deser"
+ ],
+ "thresholds_raw": {
+  "fail": {
+   "cmdi": 0.15,
+   "path": 0.75,
+   "ssrf": 0.97,
+   "codei": 0.33,
+   "sqli": 0.61,
+   "deser": 0.73
+  },
+  "review": {
+   "cmdi": 0.03,
+   "path": 0.32,
+   "ssrf": 0.39,
+   "codei": 0.02,
+   "sqli": 0.03,
+   "deser": 0.06
+  }
+ },
+ "marketplace_thresholds": {
+  "review": 0.4,
+  "fail": 0.75
+ },
+ "win": 510,
+ "stride": 256,
+ "max_eval_windows": 64,
+ "config": {
+  "name": "unix_r32",
+  "model": "microsoft/unixcoder-base",
+  "lora": true,
+  "r": 32,
+  "alpha": 64,
+  "targets": [
+   "query",
+   "key",
+   "value",
+   "dense"
+  ],
+  "lr": 0.0002,
+  "epochs": 6,
+  "synth": 1.0,
+  "ord_ratio": 1.0,
+  "lit_ratio": 1.0
+ }
+}

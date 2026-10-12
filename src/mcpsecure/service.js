@@ -70,7 +70,7 @@ function simulateAnchor() {
  */
 async function runFullPipeline(serverContent, version, isExternal = false) {
   // 1. Detection pipeline runs first (Analyzers + Policy Engine)
-  const scanRecord = engine.simulateScan(serverContent, version || 1);
+  const scanRecord = await engine.runScan(serverContent, version || 1);
 
   // 2. Check if detection and security checks are CLEAR
   if (scanRecord.verdict === 'PASS') {

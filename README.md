@@ -48,10 +48,25 @@ generate_*.py, scripts/   scripts used to produce the seed data
 
 ## Where the models plug in
 
-`src/mcpsecure/engine.js` currently uses regex heuristics for the AST taint analyzer, Model A
-(tool-description poisoning) and Model B (code vulnerabilities). The trained models replace these;
-Model B returns a 0-1 score plus evidence lines, with review/fail thresholds 0.40/0.75 from
-`ruleset.json`.
+`src/mcpsecure/engine.js` runs three analyzers and a policy engine. Review and fail thresholds are
+0.40 and 0.75, from `ruleset.json`.
+
+| Analyzer | Status |
+|---|---|
+| **Model B** (code vulnerabilities) | **Real.** The trained classifier runs as a local service in `model_b_service/` (see its README and `MODEL_CARD.md`). |
+| AST taint | Regex heuristic for now; the teammate's analyzer replaces it. |
+| Model A (tool poisoning / PMA) | Regex heuristic for now. |
+
+To use the real Model B, start the service and run the marketplace with `MODEL_B_URL`:
+
+```bash
+cd model_b_service && pip install -r requirements.txt && (cd js && npm install)
+python serve.py --port 8765                  # first start downloads the base model (~500 MB)
+cd .. && MODEL_B_URL=http://127.0.0.1:8765 npm start
+```
+
+- Without `MODEL_B_URL`, the old Model B heuristic runs, and scan records say `modelBMode: "simulated"`.
+- If the service is configured but down, scans go to REVIEW.
 
 ## Known POC shortcuts
 

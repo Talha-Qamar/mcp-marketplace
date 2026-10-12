@@ -126,6 +126,48 @@ function runModelBCode(code, astFired) {
   return { score: parseFloat(score.toFixed(3)), evidence };
 }
 
+// ─── Analyzer 2b: Model B Code — REAL model via the scan service ──────────────
+// When MODEL_B_URL is set (e.g. http://127.0.0.1:8765, started with
+// `python model_b_service/serve.py`), the trained Model B v8 classifier
+// (UniXcoder + LoRA; command injection, path traversal, SSRF, code injection,
+// SQL injection, unsafe deserialization) scores the code blocks in the server
+// description and, when github_url is a real public repo, the repo's source.
+// Fail-closed: if the service is configured but unreachable, the result is
+// REVIEW, never a silent PASS.
+
+const MODEL_B_URL = process.env.MODEL_B_URL || '';
+const MODEL_B_TIMEOUT_MS = Number(process.env.MODEL_B_TIMEOUT_MS || 600000);
+
+/**
+ * @param {object} content
+ * @returns {Promise<{ score: number, evidence: string[], threat: string, modelHash: string|null }>}
+ */
+async function runModelBService(content) {
+  try {
+    const res = await fetch(`${MODEL_B_URL.replace(/\/$/, '')}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown: content.long_description || '', github_url: content.github_url || undefined }),
+      signal: AbortSignal.timeout(MODEL_B_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const r = await res.json();
+    const evidence = r.evidence.length > 0 ? [...r.evidence]
+      : [`No vulnerable code patterns detected (${r.n_functions} functions scanned)`];
+    for (const s of r.sources || []) {
+      if (s.startsWith('github unavailable')) evidence.push(`note: ${s}`);
+    }
+    return { score: r.score, evidence, threat: r.threat, modelHash: r.model_hash };
+  } catch (e) {
+    return {
+      score: RULESET.thresholds.review,
+      evidence: [`Model B service unavailable (${e.message}); manual review required`],
+      threat: 'scanner_unavailable',
+      modelHash: null,
+    };
+  }
+}
+
 // ─── Analyzer 3: Model A Text (tool poisoning + PMA) ──────────────────────────
 // SIMULATED (POC): In production this is a fine-tuned text LLM (Model A) that
 // detects injected natural-language directives in tool descriptions that could
@@ -245,6 +287,21 @@ function simulateCommitSha(serverId, version, fingerprint) {
  * @returns {ScanRecord}
  */
 function simulateScan(content, version = 1) {
+  return buildScanRecord(content, version, null);
+}
+
+/**
+ * Scan with the real Model B when MODEL_B_URL is set; otherwise identical to simulateScan().
+ * @param {object} content
+ * @param {number} [version=1]
+ * @returns {Promise<ScanRecord>}
+ */
+async function runScan(content, version = 1) {
+  if (!MODEL_B_URL) return simulateScan(content, version);
+  return buildScanRecord(content, version, await runModelBService(content));
+}
+
+function buildScanRecord(content, version, realModelB) {
   // Build the text corpus for analysis
   const codeText = [
     content.long_description || '',
@@ -259,7 +316,7 @@ function simulateScan(content, version = 1) {
 
   // ── Run analyzers (Detection Pipeline runs FIRST) ───────────────────────────
   const astResult = runAstTaint(codeText);
-  const modelBResult = runModelBCode(codeText, astResult.fired);
+  const modelBResult = realModelB || runModelBCode(codeText, astResult.fired);
   const modelAResult = runModelAText(descriptionText);
 
   const analyzers = [
@@ -271,7 +328,8 @@ function simulateScan(content, version = 1) {
     },
     {
       analyzer: 'MODEL_B_CODE',
-      threat: modelBResult.score >= RULESET.thresholds.review ? 'command_injection' : 'none',
+      threat: realModelB ? realModelB.threat
+        : (modelBResult.score >= RULESET.thresholds.review ? 'command_injection' : 'none'),
       score: modelBResult.score,
       evidence: modelBResult.evidence.length > 0 ? modelBResult.evidence : ['No obfuscation or injection patterns detected in code'],
     },
@@ -337,12 +395,17 @@ function simulateScan(content, version = 1) {
     hashesGenerated,
     policyVersion: RULESET.policyVersion,
     rulesetHash: RULESET_HASH,
-    modelVersionHashes: RULESET.modelVersionHashes,
+    modelVersionHashes: realModelB && realModelB.modelHash
+      ? { ...RULESET.modelVersionHashes, MODEL_B_CODE: realModelB.modelHash }
+      : RULESET.modelVersionHashes,
+    modelBMode: realModelB ? 'model-b-v8' : 'simulated',
   };
 }
 
 module.exports = {
   simulateScan,
+  runScan,
+  runModelBService,
   runAstTaint,
   runModelBCode,
   runModelAText,

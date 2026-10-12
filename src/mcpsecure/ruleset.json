@@ -3,7 +3,7 @@
   "description": "MCP Secure deterministic policy ruleset v1. This file's SHA-256 is stored in every ScanRecord to guarantee reproducibility.",
   "thresholds": {
     "fail": 0.75,
-    "review": 0.40
+    "review": 0.4
   },
   "astHardFail": true,
   "analyzers": {
@@ -20,12 +20,12 @@
     "MODEL_B_CODE": {
       "weight": 0.9,
       "hardFail": false,
-      "description": "Simulated fine-tuned code model detecting obfuscated command injection patterns that static AST analysis misses."
+      "description": "Model B v8: fine-tuned code model (UniXcoder + LoRA) scoring every function for command injection, path traversal, SSRF, code injection, SQL injection and unsafe deserialization. Served by model_b_service/ (set MODEL_B_URL); simulated heuristic when unset."
     }
   },
   "modelVersionHashes": {
     "MODEL_A_TEXT": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
-    "MODEL_B_CODE": "b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a1",
-    "AST_TAINT":    "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a1b2"
+    "MODEL_B_CODE": "3276ec2589353ac40171c4881ef68e0e5802d3ece2c85be596a9fa65168c7289",
+    "AST_TAINT": "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a1b2"
   }
 }

@@ -14,3 +14,7 @@ __MACOSX/
 *.log
 .env
 .env.*
+
+# Model B service: Python caches and files generated at run time
+__pycache__/
+model_b_service/js/normalize_strip_v8.js
