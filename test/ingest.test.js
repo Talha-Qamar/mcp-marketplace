@@ -185,3 +185,19 @@ test('test-helper directories are deferred like tests/', () => {
   assert.equal(sel.deferred.length, 3);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('tool handlers list their direct calls; files are marked tool-reachable', async () => {
+  const b = await ingest({ source: { kind: 'local', path: 'eval/adversarial/s06_committed_dist_entrypoint' } });
+  assert.ok(b.tools[0].calls.includes('execSync'));
+  const reach = Object.fromEntries(b.files.map(f => [f.path, f.tool_reachable]));
+  assert.equal(reach['dist/index.js'], true);
+  assert.equal(reach['src/index.ts'], false); // not imported by the tool file
+});
+
+test('a file run by an npm install hook counts as reachable', () => {
+  const { toolReachableFiles } = require('../src/mcpsecure/ingest/reachable');
+  const files = [{ path: 'index.js', language: 'javascript', content: '' }, { path: 'scripts/setup.js', language: 'javascript', content: '' }];
+  const meta = [{ path: 'package.json', content: JSON.stringify({ scripts: { postinstall: 'node scripts/setup.js' } }) }];
+  const reach = toolReachableFiles(files, [{ file: 'index.js' }], meta);
+  assert.ok(reach.has('scripts/setup.js'));
+});

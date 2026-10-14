@@ -151,4 +151,59 @@ function admitReachable(selection) {
   return { admitted };
 }
 
-module.exports = { admitReachable, pyCandidates, jsCandidates, entrypoints };
+// package.json lifecycle scripts that npm runs on install: code they start runs
+// on the user's machine without any tool being called.
+const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare'];
+
+function installHookFiles(metadataFiles) {
+  const pkg = metadataFiles.find(f => f.path === 'package.json');
+  if (!pkg) return [];
+  let scripts;
+  try { scripts = JSON.parse(pkg.content).scripts || {}; } catch (_) { return []; }
+  const out = [];
+  for (const hook of INSTALL_HOOKS) {
+    const cmd = typeof scripts[hook] === 'string' ? scripts[hook] : '';
+    for (const m of cmd.matchAll(/(?:^|\s)\.?\/?([\w./-]+\.(?:[cm]?js|ts|py))\b/g)) {
+      const n = norm(m[1]);
+      if (n) out.push(n);
+    }
+  }
+  return out;
+}
+
+/**
+ * Files the server can run: the files that define MCP tools, everything they
+ * import (transitively), and files started by npm install hooks. A finding
+ * outside this set (build scripts, configs, dev tooling) is not reachable from
+ * tool input. Returns null when no tools were discovered (nothing to anchor on).
+ */
+function toolReachableFiles(files, tools, metadataFiles) {
+  if (!tools.length) return null;
+  const byPath = new Map(files.map(f => [f.path, f]));
+  const seen = new Set();
+  const queue = [];
+  const add = p => { if (byPath.has(p) && !seen.has(p)) { seen.add(p); queue.push(byPath.get(p)); } };
+  for (const t of tools) add(t.file);
+  for (const p of installHookFiles(metadataFiles)) add(p);
+  while (queue.length) {
+    const f = queue.shift();
+    for (const c of importCandidates(f)) add(c);
+  }
+  return seen;
+}
+
+const NOT_CALLS = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'typeof', 'await', 'new',
+  'with', 'elif', 'and', 'or', 'not', 'in', 'is', 'lambda', 'print', 'super', 'def', 'async', 'yield', 'import', 'from']);
+
+/** Names of the functions a tool handler calls directly (bare and method calls, approximate). */
+function handlerCalls(file, handler) {
+  if (!file || !handler) return [];
+  const body = file.content.split('\n').slice(handler.start_line - 1, handler.end_line).join('\n');
+  const names = new Set();
+  for (const m of body.matchAll(/([A-Za-z_$][\w$]*)\s*\(/g)) {
+    if (!NOT_CALLS.has(m[1]) && m[1] !== handler.name) names.add(m[1]);
+  }
+  return [...names].sort();
+}
+
+module.exports = { admitReachable, pyCandidates, jsCandidates, entrypoints, toolReachableFiles, handlerCalls, installHookFiles };

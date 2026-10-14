@@ -32,6 +32,30 @@ function corroborated(finding, candidates, severities) {
   });
 }
 
+/** Last segment of an analyzer function name: `Cls.run` → `run`, `tool:ui_tap` → `ui_tap`. */
+function bareName(fn) {
+  const parts = String((fn && fn.name) || '').split(/[.:]/);
+  return parts[parts.length - 1];
+}
+
+/**
+ * Is the finding on a tool's input path? 'tool_handler': inside a discovered
+ * tool handler (tool arguments are attacker input by definition).
+ * 'handler_callee': in a function a tool handler calls directly (by name, in
+ * a file tool code reaches). Returns the matching kind or null.
+ */
+function onToolPath(finding, bundle, kinds) {
+  const loc = finding.location || {};
+  if (kinds.includes('tool_handler') && loc.tool_id) return 'tool_handler';
+  if (kinds.includes('handler_callee') && loc.function) {
+    const file = (bundle.files || []).find(f => f.path === loc.file);
+    if (!file || file.tool_reachable !== true) return null;
+    const name = bareName(loc.function);
+    if (name && (bundle.tools || []).some(t => (t.calls || []).includes(name))) return 'handler_callee';
+  }
+  return null;
+}
+
 function bySlot(slotResults) {
   const m = new Map();
   for (const s of slotResults) m.set(s.slot, s);
@@ -108,14 +132,40 @@ const RULE_TYPES = {
     };
   },
 
+  cap_outside_reachable(rule, ctx) {
+    // Only meaningful when ingestion anchored reachability on discovered tools.
+    const reach = new Map((ctx.bundle.files || []).map(f => [f.path, f.tool_reachable]));
+    const capped = [];
+    for (const eff of ctx.effective) {
+      if (!rule.slots.includes(eff.slot)) continue;
+      if (reach.get((eff.finding.location || {}).file) !== false) continue;
+      if (eff.effective_score > rule.cap) {
+        eff.effective_score = rule.cap;
+        eff.rule = rule.id;
+        capped.push(eff.finding_id);
+      }
+    }
+    if (capped.length === 0) return null;
+    return { verdict: null, message: `${capped.length} finding(s) in code no MCP tool reaches counted as evidence only`, finding_ids: capped };
+  },
+
   cap_unless_corroborated(rule, ctx) {
-    const support = findingsOf(ctx.byId.get(rule.corroborating_slot));
+    const support = (rule.corroborating_slots || [rule.corroborating_slot]).flatMap(id => findingsOf(ctx.byId.get(id)));
+    const trusted = rule.trusted_locations || [];
     const capped = [];
     for (const eff of ctx.effective) {
       if (eff.slot !== rule.slot) continue;
+      if (eff.rule) continue; // already capped by an earlier rule
       const match = corroborated(eff.finding, support, rule.corroborating_severities);
       if (match) {
         eff.corroborated_by = match.finding_id;
+        continue;
+      }
+      const path = eff.raw_score >= (rule.trusted_min_score ?? 0)
+        && !(rule.trusted_exclude_threats || []).includes(eff.threat)
+        && onToolPath(eff.finding, ctx.bundle, trusted);
+      if (path) {
+        eff.corroborated_by = path;
         continue;
       }
       const cap = rule.caps.find(c => eff.raw_score >= c.min_score);

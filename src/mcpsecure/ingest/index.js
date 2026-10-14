@@ -16,7 +16,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { materialize, IngestError } = require('./sources');
 const { selectFiles } = require('./select');
-const { admitReachable } = require('./reachable');
+const { admitReachable, toolReachableFiles, handlerCalls } = require('./reachable');
 const { discoverTypeScript } = require('./discover/typescript');
 const { canonicalDigest } = require('../canonical');
 
@@ -113,6 +113,7 @@ async function ingest({ source, listing = {}, declaredTools = [] }) {
     const discovered = [...pyFound.tools, ...tsFound.tools]
       .map(t => ({ ...t, language: toolLanguage(t.file, files) }))
       .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : a.handler.start_line - b.handler.start_line || (a.name < b.name ? -1 : 1)));
+    const byPath = new Map(files.map(f => [f.path, f]));
     const tools = assignToolIds(discovered).map(t => ({
       tool_id: t.tool_id,
       name: t.name,
@@ -123,7 +124,11 @@ async function ingest({ source, listing = {}, declaredTools = [] }) {
       file: t.file,
       handler: t.handler,
       discovered_by: t.discovered_by,
+      calls: handlerCalls(byPath.get(t.file), t.handler),
     }));
+    // Which code files tool input can reach (policy: findings elsewhere are evidence only).
+    const reachable = toolReachableFiles(files, tools, metadataFiles);
+    for (const f of files) f.tool_reachable = reachable ? reachable.has(f.path) : null;
 
     let toolDiscovery = 'full';
     if (tools.length === 0) toolDiscovery = 'none';

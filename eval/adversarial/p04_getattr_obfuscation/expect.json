@@ -1,6 +1,5 @@
 {
- "expect": "DETECT",
- "threat": "command_injection",
- "group": "evasion",
- "known_gap": "AST (Mustafa): a call through getattr(module, <constant>) is not resolved to its sink; Model B scores it below review"
+  "expect": "FAIL",
+  "threat": "command_injection",
+  "group": "evasion"
 }

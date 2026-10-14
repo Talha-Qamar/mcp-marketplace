@@ -22,6 +22,14 @@ from .models import SinkCategory
 #                      injection sink.
 #   "no_safe_loader" - only a sink when Loader= is absent or is not one of
 #                      SAFE_YAML_LOADERS.
+#   "url_start"      - only a sink when the URL STARTS with tainted data, so
+#                      the caller picks scheme and host (SSRF).  Tool input in
+#                      the path or query of a fixed host is not SSRF.
+#   "sql_built"      - only a sink when the SQL text is BUILT from tainted data
+#                      (f-string, +, %, .format).  A parameterised query passes
+#                      tainted values separately and is not a sink; a tool that
+#                      passes its whole argument as the query runs SQL by
+#                      design and is not reported as injection.
 SinkSpec = Tuple[SinkCategory, List[int], List[str], Optional[str]]
 
 SINKS: Dict[str, SinkSpec] = {
@@ -49,6 +57,28 @@ SINKS: Dict[str, SinkSpec] = {
     "marshal.loads": (SinkCategory.DESERIALIZE, [0], [], None),
     "open": (SinkCategory.FILE, [0], ["file"], None),
     "pathlib.Path": (SinkCategory.FILE, [0], [], None),
+    # SSRF
+    **{
+        f"{lib}.{method}": (SinkCategory.NETWORK, [0], ["url"], "url_start")
+        for lib in ("requests", "httpx")
+        for method in ("get", "post", "put", "patch", "delete", "head", "options", "stream")
+    },
+    "requests.request": (SinkCategory.NETWORK, [1], ["url"], "url_start"),
+    "httpx.request": (SinkCategory.NETWORK, [1], ["url"], "url_start"),
+    "urllib.request.urlopen": (SinkCategory.NETWORK, [0], ["url"], "url_start"),
+    "urllib.request.Request": (SinkCategory.NETWORK, [0], ["url"], "url_start"),
+    "aiohttp.request": (SinkCategory.NETWORK, [1], ["url"], "url_start"),
+    # SQL injection (statement constructors)
+    "sqlalchemy.text": (SinkCategory.SQL, [0], [], "sql_built"),
+}
+
+#: Sinks matched on the METHOD name, for receivers that cannot be resolved to
+#: a module (``cursor.execute``, ``self.conn.execute``, ``session.get``).
+METHOD_SINKS: Dict[str, SinkSpec] = {
+    "execute": (SinkCategory.SQL, [0], ["sql", "query", "operation", "statement"], "sql_built"),
+    "executemany": (SinkCategory.SQL, [0], ["sql", "query", "operation"], "sql_built"),
+    "executescript": (SinkCategory.SQL, [0], ["sql_script"], "sql_built"),
+    "raw": (SinkCategory.SQL, [0], ["raw_query"], "sql_built"),
 }
 
 #: ``yaml.load(data, Loader=...)`` values whose final segment is in this set

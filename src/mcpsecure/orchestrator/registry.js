@@ -18,6 +18,7 @@ const CONFIG_PATH = process.env.MCS_ANALYZERS_CONFIG
 const BUILTINS = {
   text_heuristic: require('../analyzers/builtin/text_heuristic'),
   ingest_checks: require('../analyzers/builtin/ingest_checks'),
+  ts_taint: require('../analyzers/builtin/ts_taint'),
 };
 
 /** `${NAME:-default}` / `${NAME}` substitution from the environment. */

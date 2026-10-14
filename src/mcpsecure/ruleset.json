@@ -1,6 +1,6 @@
 {
-  "policyVersion": "policy-v5",
-  "description": "MCP Secure deterministic policy ruleset v4. This file's SHA-256 is stored in every ScanRecord. v2 added AST severity scores, v3 combined the real Model B with AST corroboration. v4 expressed the same rules as declarative instances over contract findings (spec §7), keyed by registry slot, and adds the coverage rules: no PASS when a required analyzer did not run, when no code analyzer covered the source, or when no MCP tools were found. v5 (from adversarial testing) adds require_complete_source and require_resolved_descriptions, and counts a code analyzer that ran as coverage even when it found no function to score.",
+  "policyVersion": "policy-v7",
+  "description": "MCP Secure deterministic policy ruleset v4. This file's SHA-256 is stored in every ScanRecord. v2 added AST severity scores, v3 combined the real Model B with AST corroboration. v4 expressed the same rules as declarative instances over contract findings (spec §7), keyed by registry slot, and adds the coverage rules: no PASS when a required analyzer did not run, when no code analyzer covered the source, or when no MCP tools were found. v5 (from adversarial testing) adds require_complete_source and require_resolved_descriptions, and counts a code analyzer that ran as coverage even when it found no function to score. v6 (Mid 1 review): a Model B fail-level finding inside a discovered MCP tool handler keeps its score without AST corroboration (tool arguments are attacker input by definition; the AST analyzer covers only Python, intra-procedural, and has no ssrf/sqli sinks, so v5 could not FAIL most real vulnerabilities),. sql_injection is excluded from that trust (database servers query by design). v7: the built-in TS/JS taint analyzer (ts_taint) corroborates Model B like the Python AST analyzer does, and its own findings need Model B to agree before they can FAIL.",
   "thresholds": {
     "fail": 0.75,
     "review": 0.4
@@ -55,7 +55,6 @@
       "id": "model_b_requires_corroboration",
       "type": "cap_unless_corroborated",
       "slot": "model_b",
-      "corroborating_slot": "ast_taint",
       "corroborating_severities": [
         "medium",
         "high"
@@ -70,7 +69,40 @@
           "cap": 0.25
         }
       ],
-      "rationale": "Model B scores one function at a time and cannot see whether tool input reaches the risky call; on 46 real MCP servers its raw maximum failed 41. A Model B finding keeps its score (and can FAIL) only when the AST analyzer reports a medium/high flow of the same threat in an overlapping function of the same file. Otherwise fail-level becomes 0.55 (REVIEW) and review-level 0.25 (evidence)."
+      "rationale": "Model B scores one function at a time and cannot see whether tool input reaches the risky call. A Model B finding keeps its score (and can FAIL) when a taint analyzer (Python ast_taint or TS/JS ts_taint) reports a medium/high flow of the same threat in an overlapping function of the same file, or (v6) when it lies inside a discovered tool handler with a raw score >= trusted_min_score: a tool handler receives attacker input by definition. Otherwise fail-level becomes 0.55 (REVIEW) and review-level 0.25 (evidence). sql_injection is excluded from tool-handler trust: database MCP servers run queries in their handlers by design (mongodb, redis, logfire scored 0.87-0.97 there), so it needs AST corroboration (Appendix E2). Threshold and exclusion chosen on eval run3gpu (148 scans): vulnerable FAIL 12/66 -> 21/66 with 0/23 benign FAIL.",
+      "trusted_locations": [
+        "tool_handler"
+      ],
+      "trusted_min_score": 0.85,
+      "trusted_exclude_threats": [
+        "sql_injection"
+      ],
+      "corroborating_slots": [
+        "ast_taint",
+        "ts_taint"
+      ]
+    },
+    {
+      "id": "ts_taint_requires_model_b",
+      "type": "cap_unless_corroborated",
+      "slot": "ts_taint",
+      "corroborating_slots": [
+        "model_b"
+      ],
+      "corroborating_severities": [
+        "high"
+      ],
+      "caps": [
+        {
+          "min_score": 0.75,
+          "cap": 0.55
+        },
+        {
+          "min_score": 0.4,
+          "cap": 0.25
+        }
+      ],
+      "rationale": "The TS/JS taint analyzer is new and approximate (name-based call resolution). Its flows keep their score, and can FAIL, only when Model B flags the same threat in an overlapping function of the same file (two independent analyzers agree); alone a flow is REVIEW (high) or evidence (medium)."
     },
     {
       "id": "score_thresholds",

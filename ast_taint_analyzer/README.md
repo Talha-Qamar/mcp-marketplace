@@ -21,7 +21,8 @@ Two consumers, so two outputs from one pass:
 - **No path sensitivity.** Both arms of an `if` are analysed and their taint states merged. A flow
   that only exists on an unreachable path is still reported.
 - **No inter-procedural analysis.** Taint does not follow into helper functions. A call to an
-  unknown free function returns a clean value.
+  unknown free function returns a clean value. (The TypeScript/JavaScript analyzer,
+  `src/mcpsecure/analyzers/builtin/ts_taint.js`, does follow calls across files.)
 - **No element-level alias analysis.** `lst[0] = tainted` taints the whole `lst`.
 - **No ML.** Zero probabilistic components. Same bytes in, same bytes out, forever.
 
@@ -74,7 +75,7 @@ python ast_taint_analyzer/service.py --port 8701     # from the repository root
 `POST /v1/analyze`; spec §6). It analyses the Python tool handlers that ingestion discovered, and
 analyses every function only in files without decorated tools. Each sink hit becomes a finding in the
 shared taxonomy: shell → `command_injection`, exec/dynamic → `code_injection`, file →
-`path_traversal`, deserialize → `unsafe_deserialization`. Hits carry real file, line and function
+`path_traversal`, deserialize → `unsafe_deserialization`, network → `ssrf`, sql → `sql_injection`. Hits carry real file, line and function
 spans. `artifact_hash` is the SHA-256 of `config.py`. The marketplace starts the service itself on
 `npm start`; `tests/test_service.py` covers the wrapper.
 
@@ -122,6 +123,18 @@ asks "what exactly do you detect?", that is the one file to open.
 | `yaml.load` | deserialize | 0 | only without `Loader=SafeLoader`/`CSafeLoader` |
 | `open` | file | 0, `file=` | — |
 | `pathlib.Path` | file | 0 | — |
+| `requests.*`, `httpx.*` (get, post, …, `request`) | network | 0 (`request`: 1), `url=` | only when the URL **starts** with tainted data (the caller picks scheme/host) |
+| `urllib.request.urlopen`, `urllib.request.Request`, `aiohttp.request` | network | 0 / 1, `url=` | same |
+| `sqlalchemy.text` | sql | 0 | only when the SQL is **built** from tainted data |
+| method `.execute`, `.executemany`, `.executescript`, `.raw` (any receiver) | sql | 0 | only when the SQL is **built** from tainted data (f-string, `+`, `%`, `.format`) |
+
+`getattr(module, "name")` with a name that folds to a constant (`"sys" + "tem"`) resolves to the
+real sink, both called directly and through a variable (`fn = getattr(os, …); fn(cmd)`).
+
+A parameterised query (`execute("… ?", (name,))`) and a tool whose whole argument is the query
+(`execute(query)`, a database tool by design) are not SQL injection; tool input in the path or query
+string of a fixed host (`requests.get(f"https://api.x.com/s?q={q}")`) is not SSRF. Network and SQL
+hits are `medium`: they corroborate Model B (policy) rather than fail a server on their own.
 
 **Sanitizers** — `shlex.quote`, `shlex.split`, `pipes.quote`, `re.escape`, `urllib.parse.quote`,
 `os.path.basename`, `html.escape`. A sanitizer on the path marks the hit `sanitized=True` and

@@ -32,6 +32,8 @@ class SinkCategory(str, Enum):
     DYNAMIC = "dynamic"  # getattr, __import__, importlib
     FILE = "file"  # open() with a tainted path
     DESERIALIZE = "deserialize"  # pickle.loads, unsafe yaml.load
+    NETWORK = "network"  # requests/httpx/urllib with a URL that starts with tool input (SSRF)
+    SQL = "sql"  # cursor.execute & co. with SQL built from tool input
 
 
 #: Numeric rank used for ``max_severity`` comparison and feature encoding.

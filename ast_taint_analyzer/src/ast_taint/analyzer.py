@@ -35,6 +35,7 @@ from .config import (
     SAFE_YAML_LOADERS,
     SANITIZERS,
     SINKS,
+    METHOD_SINKS,
     SKIP_DIR_NAMES,
     STRING_TRANSFORM_METHODS,
     UNTRUSTED_ATTRIBUTE_SOURCES,
@@ -196,7 +197,8 @@ class _FunctionAnalyzer:
     ) -> None:
         self.fn = fn
         self.lines = lines
-        self.aliases = aliases
+        self.aliases = dict(aliases)  # per function: getattr() aliases are added below
+        self.built: Set[str] = set()  # variables holding a string built from taint
 
         self.params: List[str] = param_names(fn)
         self.tainted: Dict[str, TaintInfo] = {}
@@ -254,6 +256,8 @@ class _FunctionAnalyzer:
             for target in node.targets:
                 self._scan_target(target)
                 self._bind(target, info)
+                if isinstance(target, ast.Name):
+                    self._track_alias_and_built(target.id, node.value)
             self._record_const_bool(node)
 
         elif isinstance(node, ast.AnnAssign):
@@ -275,6 +279,8 @@ class _FunctionAnalyzer:
             info = _merge(current, rhs)
             if info is not None and isinstance(node.op, ast.Add):
                 self.has_concat_flow = True
+                if isinstance(node.target, ast.Name):
+                    self.built.add(node.target.id)
             self._scan_target(node.target)
             self._bind(node.target, info)
 
@@ -681,9 +687,10 @@ class _FunctionAnalyzer:
 
     def _check_call(self, node: ast.Call) -> None:
         dotted = self._resolve(node.func)
-        if dotted is None:
-            return
-        spec = SINKS.get(dotted)
+        spec = SINKS.get(dotted) if dotted is not None else None
+        if spec is None and isinstance(node.func, ast.Attribute) and node.func.attr in METHOD_SINKS:
+            spec = METHOD_SINKS[node.func.attr]
+            dotted = dotted or "." + node.func.attr + "()"
         if spec is None:
             return
         category, positions, kwarg_names, conditional = spec
@@ -711,6 +718,10 @@ class _FunctionAnalyzer:
             info = self._taint_of(expr)
             if info is None:
                 continue
+            if conditional == "url_start" and not self._starts_tainted(expr):
+                continue  # tool input only in the path/query of a fixed host
+            if conditional == "sql_built" and not self._is_built(expr):
+                continue  # parameterised, or the whole query is the tool's input
             hops = info.hops + 1
             self._record(
                 SinkHit(
@@ -760,10 +771,69 @@ class _FunctionAnalyzer:
             return False
         return dotted.rsplit(".", 1)[-1] in SAFE_YAML_LOADERS
 
+    # -- SSRF / SQL / getattr helpers ----------------------------------------
+
+    def _track_alias_and_built(self, name: str, value: ast.expr) -> None:
+        folded = self._getattr_target(value)
+        if folded is not None:
+            self.aliases[name] = folded
+        if self._is_built(value):
+            self.built.add(name)
+        else:
+            self.built.discard(name)
+
+    def _getattr_target(self, node: ast.expr) -> Optional[str]:
+        """``getattr(os, "sys" + "tem")`` -> ``os.system`` when the name folds to a constant."""
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "getattr"
+                and len(node.args) >= 2):
+            return None
+        base = self._resolve(node.args[0])
+        attr = _const_str(node.args[1])
+        if base is None or attr is None or not attr.isidentifier():
+            return None
+        return base + "." + attr
+
+    def _is_built(self, node: Optional[ast.expr]) -> bool:
+        """A string built from tainted data around constant text."""
+        if node is None:
+            return False
+        if isinstance(node, ast.Name):
+            return node.id in self.built
+        if isinstance(node, ast.JoinedStr):
+            const = "".join(v.value for v in node.values if isinstance(v, ast.Constant) and isinstance(v.value, str))
+            tainted = any(isinstance(v, ast.FormattedValue) and self._taint_of(v.value) is not None
+                          and not _placeholders_only(v.value) for v in node.values)
+            return bool(const.strip()) and tainted
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+            literal = lambda n: (isinstance(n, ast.Constant) and isinstance(n.value, str)) or isinstance(n, ast.JoinedStr)
+            return (literal(node.left) or literal(node.right) or self._is_built(node.left) or self._is_built(node.right)) \
+                and self._taint_of(node) is not None
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+            return _const_str(node.func.value) is not None and self._taint_of(node) is not None
+        return False
+
+    def _starts_tainted(self, node: Optional[ast.expr]) -> bool:
+        """Does the value START with tainted data (so the caller picks scheme/host)?"""
+        if node is None or (isinstance(node, ast.Constant)):
+            return False
+        if isinstance(node, ast.JoinedStr):
+            first = node.values[0] if node.values else None
+            return isinstance(first, ast.FormattedValue) and self._taint_of(first.value) is not None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            return self._starts_tainted(node.left)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            return self._starts_tainted(node.left)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+            template = _const_str(node.func.value)
+            return template is not None and template.lstrip().startswith("{") and self._taint_of(node) is not None
+        return self._taint_of(node) is not None
+
     # -- helpers -----------------------------------------------------------
 
     def _resolve(self, node: Optional[ast.AST]) -> Optional[str]:
         """Dotted name for a Name/Attribute chain, with aliases applied."""
+        if isinstance(node, ast.Call):
+            return self._getattr_target(node)  # getattr(os, "system")(cmd)
         parts: List[str] = []
         current = node
         while isinstance(current, ast.Attribute):
@@ -790,6 +860,38 @@ class _FunctionAnalyzer:
             has_concat_flow=self.has_concat_flow,
             shell_true_present=self.shell_true_present,
         )
+
+
+def _placeholders_only(node: ast.AST) -> bool:
+    """``", ".join("?" for _ in ids)``: bind placeholders for a parameterised query, not data."""
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "join" and node.args):
+        return False
+    arg = node.args[0]
+    if isinstance(arg, (ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+        return _const_str(arg.elt) is not None
+    if isinstance(arg, ast.BinOp) and isinstance(arg.op, ast.Mult) and isinstance(arg.left, ast.List):
+        return all(_const_str(e) is not None for e in arg.left.elts)  # ["?"] * len(ids)
+    return False
+
+
+def _const_str(node: Optional[ast.AST]) -> Optional[str]:
+    """Fold a constant string expression: "a", "a" + "b", f"a{'b'}"."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _const_str(node.left), _const_str(node.right)
+        return left + right if left is not None and right is not None else None
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for v in node.values:
+            if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                parts.append(v.value)
+            elif isinstance(v, ast.FormattedValue) and _const_str(v.value) is not None and v.format_spec is None:
+                parts.append(_const_str(v.value))
+            else:
+                return None
+        return "".join(parts)
+    return None
 
 
 def _base_name(node: ast.AST) -> Optional[str]:

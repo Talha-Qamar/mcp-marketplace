@@ -34,6 +34,8 @@ CATEGORY_THREAT = {
     "dynamic": ("code_injection", "CWE-94"),
     "file": ("path_traversal", "CWE-22"),
     "deserialize": ("unsafe_deserialization", "CWE-502"),
+    "network": ("ssrf", "CWE-918"),
+    "sql": ("sql_injection", "CWE-89"),
 }
 # Same table as ruleset astSeverityScores (policy-v2+): high trips the hard-fail gate.
 SEVERITY_SCORE = {"high": 1.0, "medium": 0.55, "low": 0.25}

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { watchErrors } = require('./helpers');
+const { policyVersion } = require('../../src/mcpsecure/ruleset.json');
 
 for (const [slug, pick, verdict, analyzerText] of [
   ['weather-tools', '#pick-weather', 'PASS', 'AST taint analyzer'],
@@ -17,7 +18,7 @@ for (const [slug, pick, verdict, analyzerText] of [
     await expect(page.locator('#verdict-content')).toContainText(verdict, { timeout: 120_000 });
     await expect(page.locator('#parse-content')).toContainText('MCP tool(s) found');
     await expect(page.locator('#analyzers-grid')).toContainText(analyzerText);
-    await expect(page.locator('#policy-content')).toContainText('policy-v5');
+    await expect(page.locator('#policy-content')).toContainText(policyVersion);
     expect(errors).toEqual([]);
   });
 }

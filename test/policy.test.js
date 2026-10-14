@@ -111,3 +111,59 @@ test('a code analyzer that ran counts as coverage even with nothing to score', (
   s[1] = { ...slot('model_b', 'code', 'ok'), result: { status: 'ok', findings: [], coverage: { units_total: 0, units_analyzed: 0, notes: [] } } };
   assert.equal(decide(s, bundle(), ruleset).verdict, 'PASS');
 });
+
+// ── policy-v6: tool-handler trust and unreachable code ──────────────────────
+
+const inTool = (f, toolId = 's.py#run') => ({ ...f, location: { ...f.location, tool_id: toolId } });
+// cap_outside_reachable is implemented but off in ruleset.json until its anchoring is fixed (spec Appendix D).
+const withReachCap = (() => {
+  const r = JSON.parse(JSON.stringify(ruleset));
+  const at = r.rules.findIndex(x => x.id === 'model_b_requires_corroboration');
+  r.rules.splice(at, 0, { id: 'unreachable_code_is_evidence', type: 'cap_outside_reachable', slots: ['model_b'], cap: 0.25 });
+  return r;
+})();
+
+test('v6: a strong Model B finding inside a tool handler FAILs without AST corroboration', () => {
+  const s = clean();
+  s[1] = slot('model_b', 'code', 'ok', [inTool(finding('b1', 'ssrf', 0.9, 'high'))]);
+  const d = decide(s, bundle(), ruleset);
+  assert.equal(d.verdict, 'FAIL');
+  assert.equal(d.effective_findings[0].effective_score, 0.9);
+  assert.equal(d.effective_findings[0].corroborated_by, 'tool_handler');
+});
+
+test('v6: a tool-handler finding below trusted_min_score is still capped to REVIEW', () => {
+  const s = clean();
+  const min = ruleset.rules.find(r => r.id === 'model_b_requires_corroboration').trusted_min_score;
+  s[1] = slot('model_b', 'code', 'ok', [inTool(finding('b1', 'ssrf', min - 0.05, 'high'))]);
+  const d = decide(s, bundle(), ruleset);
+  assert.equal(d.verdict, 'REVIEW');
+  assert.equal(d.effective_findings[0].effective_score, 0.55);
+});
+
+test('v6: a Model B finding in code no tool reaches is evidence only', () => {
+  const s = clean();
+  s[1] = slot('model_b', 'code', 'ok', [finding('b1', 'command_injection', 1.0, 'high', 'scripts/build.js')]);
+  const files = [{ path: 's.py', tool_reachable: true }, { path: 'scripts/build.js', tool_reachable: false }];
+  const d = decide(s, bundle({ files }), withReachCap);
+  assert.equal(d.verdict, 'PASS');
+  assert.equal(d.effective_findings[0].effective_score, 0.25);
+  assert.equal(d.effective_findings[0].rule, 'unreachable_code_is_evidence');
+});
+
+test('v6: unknown reachability (no tools discovered) never lowers a finding', () => {
+  const s = clean();
+  s[1] = slot('model_b', 'code', 'ok', [finding('b1', 'command_injection', 1.0, 'high', 'scripts/build.js')]);
+  const files = [{ path: 'scripts/build.js', tool_reachable: null }];
+  const d = decide(s, bundle({ files, coverage: { tool_discovery: 'none', notes: [] } }), withReachCap);
+  assert.equal(d.verdict, 'REVIEW');
+  assert.equal(d.effective_findings[0].effective_score, 0.55);
+});
+
+test('v6: SQL injection in a tool handler still needs AST corroboration (database servers query by design)', () => {
+  const s = clean();
+  s[1] = slot('model_b', 'code', 'ok', [inTool(finding('b1', 'sql_injection', 0.97, 'high'))]);
+  const d = decide(s, bundle(), ruleset);
+  assert.equal(d.verdict, 'REVIEW');
+  assert.equal(d.effective_findings[0].effective_score, 0.55);
+});
