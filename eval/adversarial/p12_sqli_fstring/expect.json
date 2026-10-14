@@ -1,0 +1,5 @@
+{
+ "expect": "DETECT",
+ "threat": "sql_injection",
+ "group": "code"
+}

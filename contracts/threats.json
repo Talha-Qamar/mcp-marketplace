@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "threats": {
+    "command_injection":       { "cwe": "CWE-78",  "label": "Command injection" },
+    "code_injection":          { "cwe": "CWE-94",  "label": "Code injection" },
+    "path_traversal":          { "cwe": "CWE-22",  "label": "Path traversal" },
+    "unsafe_deserialization":  { "cwe": "CWE-502", "label": "Unsafe deserialization" },
+    "ssrf":                    { "cwe": "CWE-918", "label": "Server-side request forgery" },
+    "sql_injection":           { "cwe": "CWE-89",  "label": "SQL injection" },
+    "tool_poisoning":          { "cwe": null,      "label": "Tool poisoning" },
+    "preference_manipulation": { "cwe": null,      "label": "Preference manipulation" },
+    "metadata_mismatch":       { "cwe": null,      "label": "Declared tools differ from the code" }
+  }
+}

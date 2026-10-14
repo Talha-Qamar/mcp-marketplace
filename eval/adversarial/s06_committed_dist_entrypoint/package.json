@@ -1,0 +1,1 @@
+{"name": "x", "main": "dist/index.js", "bin": {"x": "dist/index.js"}}

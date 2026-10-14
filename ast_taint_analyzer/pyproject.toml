@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ast-taint"
+version = "0.1.0"
+description = "Deterministic static taint analyzer for MCP server tool functions (MCP Secure, Part 2)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Syed Muhammad Mustafa" }]
+keywords = ["mcp", "static-analysis", "taint", "command-injection", "security"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+# Standard library only. Adding a runtime dependency here breaks the
+# "offline, self-contained analyzer" property the project is built on.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+
+[project.scripts]
+ast-taint = "ast_taint.cli:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

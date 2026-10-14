@@ -1,0 +1,156 @@
+{
+  "description": "Popular MCP servers with no open advisory at the pinned commit: a presumed-benign set for measuring false rejections. 'by_design' marks servers whose PURPOSE is executing commands or code; flagging those is arguably correct (a marketplace should surface the capability) and they are reported separately. Commits are pinned by eval/run_eval.js on first resolution.",
+  "cases": [
+    {
+      "id": "mcp-servers/fetch",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/fetch",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/git",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/git",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/time",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/time",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/memory",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/memory",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/sequentialthinking",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/sequentialthinking",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/everything",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/everything",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "mcp-servers/filesystem",
+      "repo": "https://github.com/modelcontextprotocol/servers",
+      "subdir": "src/filesystem",
+      "commit": "bbb701e7ac1e57f3edd1c2836b94c5457eaf7b9c"
+    },
+    {
+      "id": "microsoft/playwright-mcp",
+      "repo": "https://github.com/microsoft/playwright-mcp",
+      "commit": "b8b4183e099f136cbec0388a6088d4aa2f6b9685"
+    },
+    {
+      "id": "github/github-mcp-server",
+      "repo": "https://github.com/github/github-mcp-server",
+      "note": "Go: no code analyzer coverage expected",
+      "commit": "07e24668f8708a143bdbec700c20f5e6c4942e28"
+    },
+    {
+      "id": "makenotion/notion-mcp-server",
+      "repo": "https://github.com/makenotion/notion-mcp-server",
+      "commit": "730ae781ba28beeaf0865025a3f2ed4c25ea2387"
+    },
+    {
+      "id": "supabase-community/supabase-mcp",
+      "repo": "https://github.com/supabase-community/supabase-mcp",
+      "commit": "1f9da038a07767b594d241cbfe2076a9a9631e47"
+    },
+    {
+      "id": "firecrawl/firecrawl-mcp-server",
+      "repo": "https://github.com/firecrawl/firecrawl-mcp-server",
+      "commit": "086518b4974a475065d2688d0ff969a70431b23d"
+    },
+    {
+      "id": "exa-labs/exa-mcp-server",
+      "repo": "https://github.com/exa-labs/exa-mcp-server",
+      "commit": "e9c3b0126a3373eb1aeaca162e84d0791ff4c7f7"
+    },
+    {
+      "id": "tavily-ai/tavily-mcp",
+      "repo": "https://github.com/tavily-ai/tavily-mcp",
+      "commit": "1c1d54c2a619afe52544f775c8d82a56ac6d8bb5"
+    },
+    {
+      "id": "upstash/context7",
+      "repo": "https://github.com/upstash/context7",
+      "commit": "33414e6e3fc157c936348ca8ddba25e50dacaeee"
+    },
+    {
+      "id": "browserbase/mcp-server-browserbase",
+      "repo": "https://github.com/browserbase/mcp-server-browserbase",
+      "commit": "3e6f53461949037d5e65dd425da3ceb1263f11d6"
+    },
+    {
+      "id": "mongodb-js/mongodb-mcp-server",
+      "repo": "https://github.com/mongodb-js/mongodb-mcp-server",
+      "commit": "49031a65fcfa5761310e0855a50625dd353a5dd4"
+    },
+    {
+      "id": "redis/mcp-redis",
+      "repo": "https://github.com/redis/mcp-redis",
+      "commit": "712749ddc674da2d612afa2a985902a9554408e8"
+    },
+    {
+      "id": "ClickHouse/mcp-clickhouse",
+      "repo": "https://github.com/ClickHouse/mcp-clickhouse",
+      "commit": "d21fe75a6f09afbfbe4cd5063372020bbe62c491"
+    },
+    {
+      "id": "pydantic/logfire-mcp",
+      "repo": "https://github.com/pydantic/logfire-mcp",
+      "commit": "1e11c2ce193050a11fc956151a2adc78966518c1"
+    },
+    {
+      "id": "awslabs/aws-documentation",
+      "repo": "https://github.com/awslabs/mcp",
+      "subdir": "src/aws-documentation-mcp-server",
+      "commit": "c19578d8858fa9563fea97012186b389e3567e6e"
+    },
+    {
+      "id": "neo4j/mcp-neo4j-cypher",
+      "repo": "https://github.com/neo4j-contrib/mcp-neo4j",
+      "subdir": "servers/mcp-neo4j-cypher",
+      "commit": "1c7ad0793b5f06b42b9c44f855c23eb2064c3bb7"
+    },
+    {
+      "id": "GLips/Figma-Context-MCP",
+      "repo": "https://github.com/GLips/Figma-Context-MCP",
+      "note": "latest, after CVE-2025-53967 fix",
+      "commit": "c083d65c7e002923e7cb98f4e3bdafb105e90f6d"
+    },
+    {
+      "id": "joshuayoes/ios-simulator-mcp",
+      "repo": "https://github.com/joshuayoes/ios-simulator-mcp",
+      "note": "latest, after CVE-2025-52573 fix",
+      "by_design": "runs xcrun simctl",
+      "commit": "a32f7f836393424d83b9476928da5518e178daa9"
+    },
+    {
+      "id": "Flux159/mcp-server-kubernetes",
+      "repo": "https://github.com/Flux159/mcp-server-kubernetes",
+      "by_design": "runs kubectl",
+      "commit": "3d71add204014dcceddebe53e9695ed7d8a6d129"
+    },
+    {
+      "id": "wonderwhy-er/DesktopCommanderMCP",
+      "repo": "https://github.com/wonderwhy-er/DesktopCommanderMCP",
+      "by_design": "executes shell commands",
+      "commit": "d38179bed7d2a7f0d9beeaef2080a25614134b63"
+    },
+    {
+      "id": "ahujasid/blender-mcp",
+      "repo": "https://github.com/ahujasid/blender-mcp",
+      "by_design": "executes Python in Blender",
+      "commit": "7a0373ec9199183cb460068c4f96aed9c579fb4f"
+    }
+  ]
+}

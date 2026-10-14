@@ -1,19 +1,37 @@
 {
   "name": "mcp-marketplace",
   "version": "1.0.0",
-  "description": "MCP Server Marketplace Replica — Local Testing Environment for MCP-SecureCreate FYP",
+  "description": "MCP Server Marketplace Replica \u2014 Local Testing Environment for MCP-SecureCreate FYP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node database/seed.js"
+    "seed": "node database/seed.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js && cd ast_taint_analyzer && python3 -m pytest -q",
+    "scan": "node bin/mcs-scan.js",
+    "conformance": "node scripts/conformance.js",
+    "analyzer:ast": "python3 ast_taint_analyzer/service.py --port 8701",
+    "analyzer:model-b": "cd model_b_service && .venv/bin/python serve.py --port 8765",
+    "test:e2e": "playwright test",
+    "eval": "node eval/run_eval.js --set all",
+    "eval:report": "node eval/report.js",
+    "eval:adversarial": "node eval/run_adversarial.js",
+    "eval:corpus": "python3 eval/build_corpus.py"
   },
   "dependencies": {
-    "sql.js": "^1.11.0",
+    "ajv": "^8.20.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.11.1",
     "express": "^4.21.0",
     "express-session": "^1.18.1",
-    "bcryptjs": "^2.4.3",
     "marked": "^15.0.0",
+    "typescript": "^5.9.3",
     "uuid": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
   }
 }

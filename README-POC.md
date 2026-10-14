@@ -26,12 +26,39 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 
 ### Demo Flow (recommended order)
 
-1. **`/scan`** — Select "Shell Runner" → watch pipeline → `FAIL` verdict with detailed evidence
-2. **`/scan`** — Select "Weather Tools" → `PASS` → signed attestation issued
-3. **`/attestations`** → "Verify a Server" tab → `weather-tools` → all 5 checks pass → **Trusted**
-4. **`/watcher`** → click "☠ Bait & Switch" on weather-tools → old PASS **superseded** → new **FAIL**
-5. **`/verifier`** → External Marketplace mode → scan `acme-crm-connector` → signed attestation downloaded
-6. **`/verifier`** → MCP Endpoint Inspector → see JSON in/out
+1. **`/scan`**: select "Shell Runner", watch the live pipeline, get `FAIL` with file:line evidence.
+2. **`/scan`**: select "Weather Tools", get `PASS` and a signed attestation.
+3. **`/publish`** (log in as `alice_dev@example.com`): pick a preset, or paste a public GitHub repo.
+   The submission is scanned and the listing appears only if the verdict allows it.
+4. **`/admin`** → Review queue (log in as `dave_sec@example.com`): approve or reject a REVIEW
+   submission. A note is required, and the decision is saved.
+5. **`/attestations`** → "Verify a Server" tab → `weather-tools`: all checks pass, **Trusted**.
+6. **`/watcher`**:
+   - "Docs only" re-ingests with a README change; the fingerprint is unchanged, so there is no re-scan.
+   - "☠ Bait & Switch" swaps in the rug-pull code. The fingerprint changes, the server is re-scanned
+     and gets `FAIL`, and the listing is suspended.
+7. **`/verifier`** → External Marketplace mode: scan a real public repo (the official fetch server).
+   The candidate is never onboarded.
+
+### Live GitHub testbed (demo mode)
+
+[`Talha-Qamar/mcp-secure-testbed`](https://github.com/Talha-Qamar/mcp-secure-testbed) is a public repo of
+intentionally vulnerable MCP servers, **one branch per case**: every code threat class (command injection
+in Python and TypeScript, code injection, path traversal, SSRF, SQL injection, unsafe deserialization,
+a hidden backdoor), hiding tricks (committed `dist/`, code under `examples/`, runtime descriptions),
+tool poisoning, rug pulls and clean controls. It is built from `demo_servers/` and `eval/adversarial/`.
+Every scan of it goes through real git ingestion (`git ls-remote` → pinned commit → shallow fetch).
+
+- **`/publish`** and **`/verifier`** (Individual Verify) have a **Live GitHub testbed** picker: the testbed
+  branches plus real MCP servers pinned to releases with a published advisory.
+- **Live rug pull:** publish the `watcher-demo` case (PASS, listed), then run
+  `node scripts/testbed.js rugpull` (pushes a malicious commit to that branch) and press **Poll Now** on
+  `/watcher`. The watcher finds the new commit, re-scans it through the gate, and the listing is
+  suspended. `node scripts/testbed.js reset` restores the clean version.
+- `E2E_LIVE_TESTBED=1 npx playwright test tests/e2e/live_testbed.spec.js` runs both flows automatically.
+
+`DEMO_MODE` (on unless `NODE_ENV=production`; set `DEMO_MODE=1` or `0` to force) controls the demo-only
+features: bundled `demo:<name>` sources, the simulated watcher buttons, and the testbed picker.
 
 ---
 
@@ -46,13 +73,17 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 | Merkle inclusion proofs | **REAL** | Sibling path, verified in browser |
 | Transparency log (append-only) | **REAL** | SQL table, monotonic index |
 | Signed Tree Head | **REAL** | Ed25519 over `{rootHash, size, timestamp}` |
-| AST Taint Analyzer | **SIMULATED** | Regex heuristics → future: tree-sitter inter-procedural taint |
-| Model A (text, tool poisoning) | **SIMULATED** | Regex heuristics → future: fine-tuned LoRA text model |
-| Model B (code, obfuscation) | **SIMULATED** | Regex heuristics → future: fine-tuned LoRA code model |
-| Policy Engine | **REAL** | Pure deterministic function, production-identical |
-| Model C (triage agent) | **SIMULATED** | Static text → future: autonomous LLM agent with toolset |
-| Blockchain anchoring | **SIMULATED** | In-process mock → future: Ethereum Sepolia via ethers.js |
-| Watcher commit SHA | **SIMULATED** | SHA-256 of content → future: `git ls-remote` via cron |
+| AST Taint Analyzer | **REAL** | Python `ast` taint engine (`ast_taint_analyzer/`, Part 2) served over the analyzer contract (`service.py`, :8701). Analyses the tool handlers that ingestion discovered. Sinks: shell, exec, file, deserialization, and (Mid 1 review) SSRF, SQL built from input, constant `getattr` |
+| TS/JS Taint Analyzer | **REAL** | Built-in (`src/mcpsecure/analyzers/builtin/ts_taint.js`): TypeScript compiler, follows tool input across functions and files into `child_process`, `eval`/`vm`, `fs`, `fetch`/`axios`, SQL. Its findings need Model B to agree before a FAIL |
+| Model A (text, tool poisoning / preference manipulation) | **HEURISTIC STAND-IN** | Built-in regex analyzer behind the same contract, labelled in the UI. Replaced by setting `MODEL_A_URL` once the trained model is served |
+| Model B (code vulnerabilities) | **REAL** | Trained Model B v8.2 (UniXcoder + LoRA, 6 classes) served over the contract (`model_b_service/serve.py`, :8765). FAIL when a taint analyzer (Python AST or TS/JS) proves the same flow, or a finding scoring ≥ 0.85 inside a tool handler (SQL injection still needs a proven flow). If it is not running the slot reports so and nothing can PASS |
+| Policy Engine | **REAL** | Pure deterministic function (policy-v7): rule types in `src/mcpsecure/policy/engine.js`, rule instances in `ruleset.json`. No PASS without coverage |
+| Submission gate | **REAL** | `/api/v1/submissions`: hidden listing → scan → approved / in review / rejected; admin decisions stored with a note |
+| Ingestion | **REAL** | Git repos cloned at a pinned commit (real SHA), uploads, or the bundled demo servers. One file filter; static tool discovery for Python (decorators, low-level `Tool(...)`) and TypeScript (`server.tool`, `registerTool`, low-level handlers). Nothing is executed |
+| Scan pipeline stage timings | **REAL** | Streamed over SSE from the backend as each stage completes; durations are measured, never scripted. Timings are deliberately excluded from the ScanRecord so the signed artifact stays byte-identical across runs |
+| Model C (verification agent) | **NOT BUILT YET** | Registry slot ready (`MODEL_C_URL`). Advisory only, runs on REVIEW; the admin decides |
+| Blockchain anchoring | **SIMULATED** | In-process mock → future: Ethereum Sepolia via ethers.js. Every field is *derived* (block advance and tx hash come from the Merkle root), never random, so the mock preserves the project's determinism property. A real Sepolia tx would not be reproducible this way — block number and tx hash come from the network |
+| Watcher | **REAL (on demand)** | **Poll Now** runs `git ls-remote` on every listed git server; a new commit is re-scanned through the gate (D5: listing pinned while scanned, suspended on FAIL). Fingerprints cover code, so a docs-only change is not a re-scan. Scheduled background polling is Final 1; the simulated buttons remain for the bundled demo servers (`DEMO_MODE`) |
 
 ---
 
@@ -62,7 +93,7 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 | File | Purpose |
 |---|---|
 | `src/mcpsecure/crypto.js` | Real SHA-256, Ed25519, Merkle |
-| `src/mcpsecure/engine.js` | Deterministic scan engine (3 analyzers + policy) |
+| `src/mcpsecure/engine.js` | Builds the ScanRecord from the orchestrator (`src/mcpsecure/orchestrator/`) |
 | `src/mcpsecure/store.js` | DB wrapper for 5 MCS tables |
 | `src/mcpsecure/service.js` | Orchestration: scan → attest → log → anchor |
 | `src/mcpsecure/seed.js` | Demo server seeding (idempotent) |
@@ -97,6 +128,7 @@ All endpoints at `/api/mcs`:
 |---|---|---|
 | `GET` | `/pubkey` | Ed25519 public key (for client verification) |
 | `POST` | `/scan` | Run scan pipeline on a marketplace server |
+| `GET` | `/scan/stream?serverSlug=&baitAndSwitch=` | Same scan over SSE — `begin`, `stage`, `result`, `error` events with measured per-stage durations |
 | `GET` | `/scans[?serverSlug=]` | List scan records |
 | `GET` | `/attestations/:id` | Get single attestation |
 | `GET` | `/log` | Transparency log leaves + signed tree head |
@@ -115,25 +147,11 @@ All endpoints at `/api/mcs`:
 
 ## Upgrade Path (from POC → Production)
 
-### 1. Replace heuristic analyzers with real ML models
+### 1. Plug in the remaining models
 
-```js
-// In src/mcpsecure/engine.js — replace runAstTaint() with:
-const { execFile } = require('child_process');
-function runAstTaint(code) {
-  // Call tree-sitter taint analyzer subprocess
-  return execFile('mcs-taint', ['--stdin'], { input: code });
-}
-
-// Replace runModelAText() with:
-async function runModelAText(text) {
-  const resp = await fetch(process.env.MODEL_A_ENDPOINT, {
-    method: 'POST', body: JSON.stringify({ text }),
-    headers: { Authorization: 'Bearer ' + process.env.MODEL_A_KEY }
-  });
-  return resp.json(); // { score, evidence, threats }
-}
-```
+Analyzers are services behind one contract (spec §6), so nothing in the engine changes. Implement
+`/v1/health` + `/v1/analyze`, pass `npm run conformance -- --url <service>`, then set `MODEL_A_URL`
+(or `MODEL_C_URL`). See README.md → "Adding an analyzer".
 
 ### 2. Anchor to Ethereum Sepolia
 

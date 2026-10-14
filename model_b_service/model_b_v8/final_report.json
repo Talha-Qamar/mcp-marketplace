@@ -1,0 +1,2496 @@
+{
+ "config": {
+  "name": "unix_r32",
+  "model": "microsoft/unixcoder-base",
+  "lora": true,
+  "r": 32,
+  "alpha": 64,
+  "targets": [
+   "query",
+   "key",
+   "value",
+   "dense"
+  ],
+  "lr": 0.0002,
+  "epochs": 6,
+  "synth": 1.0,
+  "ord_ratio": 1.0,
+  "lit_ratio": 1.0
+ },
+ "classes": [
+  "cmdi",
+  "path",
+  "ssrf",
+  "codei",
+  "sqli",
+  "deser"
+ ],
+ "cv": [
+  {
+   "fold": 0,
+   "tag": "cv0",
+   "train_rows": 4492,
+   "train_windows": 5663,
+   "best_epoch": 3.0,
+   "minutes": 34.9,
+   "history": [
+    {
+     "eval_loss": 0.14944522082805634,
+     "eval_pr_auc_macro": 0.6011,
+     "eval_runtime": 94.0876,
+     "eval_samples_per_second": 49.231,
+     "eval_steps_per_second": 0.776,
+     "epoch": 1.0,
+     "step": 354
+    },
+    {
+     "eval_loss": 0.15241298079490662,
+     "eval_pr_auc_macro": 0.6918,
+     "eval_runtime": 94.1462,
+     "eval_samples_per_second": 49.2,
+     "eval_steps_per_second": 0.775,
+     "epoch": 2.0,
+     "step": 708
+    },
+    {
+     "eval_loss": 0.18565648794174194,
+     "eval_pr_auc_macro": 0.761,
+     "eval_runtime": 94.4755,
+     "eval_samples_per_second": 49.029,
+     "eval_steps_per_second": 0.773,
+     "epoch": 3.0,
+     "step": 1062
+    },
+    {
+     "eval_loss": 0.18652848899364471,
+     "eval_pr_auc_macro": 0.7385,
+     "eval_runtime": 93.9089,
+     "eval_samples_per_second": 49.324,
+     "eval_steps_per_second": 0.777,
+     "epoch": 4.0,
+     "step": 1416
+    },
+    {
+     "eval_loss": 0.20586678385734558,
+     "eval_pr_auc_macro": 0.741,
+     "eval_runtime": 94.0692,
+     "eval_samples_per_second": 49.24,
+     "eval_steps_per_second": 0.776,
+     "epoch": 5.0,
+     "step": 1770
+    }
+   ],
+   "trainable": 5903622,
+   "val": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 90,
+      "pr_auc": 0.8057,
+      "recall": 0.7778
+     },
+     "path": {
+      "n_pos": 148,
+      "pr_auc": 0.6992,
+      "recall": 0.7297
+     },
+     "ssrf": {
+      "n_pos": 48,
+      "pr_auc": 0.753,
+      "recall": 0.7917
+     },
+     "codei": {
+      "n_pos": 41,
+      "pr_auc": 0.7738,
+      "recall": 0.7073
+     },
+     "sqli": {
+      "n_pos": 43,
+      "pr_auc": 0.7466,
+      "recall": 0.6047
+     },
+     "deser": {
+      "n_pos": 36,
+      "pr_auc": 0.7875,
+      "recall": 0.9722
+     }
+    },
+    "pr_auc_macro": 0.761,
+    "any_pr_auc": 0.7654,
+    "any_roc_auc": 0.944,
+    "threshold": 0.59,
+    "recall": 0.7537,
+    "precision": 0.7051,
+    "tp": 306,
+    "fp": 128,
+    "fn": 100,
+    "top_class_correct": 0.9771,
+    "ordinary_flag_rate": 0.0053,
+    "literal_flag_rate": 0.009
+   }
+  },
+  {
+   "fold": 1,
+   "tag": "cv1",
+   "train_rows": 4494,
+   "train_windows": 5810,
+   "best_epoch": 6.0,
+   "minutes": 41.3,
+   "history": [
+    {
+     "eval_loss": 0.10146848857402802,
+     "eval_pr_auc_macro": 0.5796,
+     "eval_runtime": 84.4035,
+     "eval_samples_per_second": 49.583,
+     "eval_steps_per_second": 0.782,
+     "epoch": 1.0,
+     "step": 364
+    },
+    {
+     "eval_loss": 0.10857691615819931,
+     "eval_pr_auc_macro": 0.6767,
+     "eval_runtime": 84.471,
+     "eval_samples_per_second": 49.544,
+     "eval_steps_per_second": 0.781,
+     "epoch": 2.0,
+     "step": 728
+    },
+    {
+     "eval_loss": 0.10470732301473618,
+     "eval_pr_auc_macro": 0.7377,
+     "eval_runtime": 84.0963,
+     "eval_samples_per_second": 49.764,
+     "eval_steps_per_second": 0.785,
+     "epoch": 3.0,
+     "step": 1092
+    },
+    {
+     "eval_loss": 0.10640779137611389,
+     "eval_pr_auc_macro": 0.7802,
+     "eval_runtime": 84.0557,
+     "eval_samples_per_second": 49.788,
+     "eval_steps_per_second": 0.785,
+     "epoch": 4.0,
+     "step": 1456
+    },
+    {
+     "eval_loss": 0.11071255803108215,
+     "eval_pr_auc_macro": 0.7804,
+     "eval_runtime": 84.5342,
+     "eval_samples_per_second": 49.507,
+     "eval_steps_per_second": 0.781,
+     "epoch": 5.0,
+     "step": 1820
+    },
+    {
+     "eval_loss": 0.12275248020887375,
+     "eval_pr_auc_macro": 0.7851,
+     "eval_runtime": 84.1456,
+     "eval_samples_per_second": 49.735,
+     "eval_steps_per_second": 0.784,
+     "epoch": 6.0,
+     "step": 2184
+    }
+   ],
+   "trainable": 5903622,
+   "val": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 89,
+      "pr_auc": 0.9134,
+      "recall": 0.9438
+     },
+     "path": {
+      "n_pos": 148,
+      "pr_auc": 0.6618,
+      "recall": 0.6216
+     },
+     "ssrf": {
+      "n_pos": 49,
+      "pr_auc": 0.6293,
+      "recall": 0.6735
+     },
+     "codei": {
+      "n_pos": 41,
+      "pr_auc": 0.8801,
+      "recall": 0.9756
+     },
+     "sqli": {
+      "n_pos": 43,
+      "pr_auc": 0.8085,
+      "recall": 0.6977
+     },
+     "deser": {
+      "n_pos": 36,
+      "pr_auc": 0.8174,
+      "recall": 0.8611
+     }
+    },
+    "pr_auc_macro": 0.7851,
+    "any_pr_auc": 0.7934,
+    "any_roc_auc": 0.9605,
+    "threshold": 0.71,
+    "recall": 0.7635,
+    "precision": 0.7045,
+    "tp": 310,
+    "fp": 130,
+    "fn": 96,
+    "top_class_correct": 0.9742,
+    "ordinary_flag_rate": 0.0073,
+    "literal_flag_rate": 0.0165
+   }
+  },
+  {
+   "fold": 2,
+   "tag": "cv2",
+   "train_rows": 4512,
+   "train_windows": 5802,
+   "best_epoch": 5.0,
+   "minutes": 41.6,
+   "history": [
+    {
+     "eval_loss": 0.10325305908918381,
+     "eval_pr_auc_macro": 0.6133,
+     "eval_runtime": 86.9995,
+     "eval_samples_per_second": 49.299,
+     "eval_steps_per_second": 0.782,
+     "epoch": 1.0,
+     "step": 363
+    },
+    {
+     "eval_loss": 0.09351399540901184,
+     "eval_pr_auc_macro": 0.6853,
+     "eval_runtime": 86.5057,
+     "eval_samples_per_second": 49.581,
+     "eval_steps_per_second": 0.786,
+     "epoch": 2.0,
+     "step": 726
+    },
+    {
+     "eval_loss": 0.10090487450361252,
+     "eval_pr_auc_macro": 0.7267,
+     "eval_runtime": 87.0312,
+     "eval_samples_per_second": 49.281,
+     "eval_steps_per_second": 0.781,
+     "epoch": 3.0,
+     "step": 1089
+    },
+    {
+     "eval_loss": 0.10237915068864822,
+     "eval_pr_auc_macro": 0.7617,
+     "eval_runtime": 86.7027,
+     "eval_samples_per_second": 49.468,
+     "eval_steps_per_second": 0.784,
+     "epoch": 4.0,
+     "step": 1452
+    },
+    {
+     "eval_loss": 0.11676088720560074,
+     "eval_pr_auc_macro": 0.7731,
+     "eval_runtime": 87.136,
+     "eval_samples_per_second": 49.222,
+     "eval_steps_per_second": 0.78,
+     "epoch": 5.0,
+     "step": 1815
+    },
+    {
+     "eval_loss": 0.12584759294986725,
+     "eval_pr_auc_macro": 0.7705,
+     "eval_runtime": 86.7498,
+     "eval_samples_per_second": 49.441,
+     "eval_steps_per_second": 0.784,
+     "epoch": 6.0,
+     "step": 2178
+    }
+   ],
+   "trainable": 5903622,
+   "val": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 89,
+      "pr_auc": 0.918,
+      "recall": 0.9326
+     },
+     "path": {
+      "n_pos": 147,
+      "pr_auc": 0.7226,
+      "recall": 0.7075
+     },
+     "ssrf": {
+      "n_pos": 48,
+      "pr_auc": 0.5194,
+      "recall": 0.625
+     },
+     "codei": {
+      "n_pos": 40,
+      "pr_auc": 0.8396,
+      "recall": 0.85
+     },
+     "sqli": {
+      "n_pos": 42,
+      "pr_auc": 0.7768,
+      "recall": 0.7857
+     },
+     "deser": {
+      "n_pos": 35,
+      "pr_auc": 0.8621,
+      "recall": 0.9429
+     }
+    },
+    "pr_auc_macro": 0.7731,
+    "any_pr_auc": 0.7931,
+    "any_roc_auc": 0.9575,
+    "threshold": 0.63,
+    "recall": 0.7905,
+    "precision": 0.7013,
+    "tp": 317,
+    "fp": 135,
+    "fn": 84,
+    "top_class_correct": 0.9874,
+    "ordinary_flag_rate": 0.008,
+    "literal_flag_rate": 0.0146
+   }
+  }
+ ],
+ "cv_summary": {
+  "pr_auc_macro": [
+   0.7731,
+   0.0098
+  ],
+  "any_pr_auc": [
+   0.784,
+   0.0131
+  ],
+  "recall": [
+   0.7692,
+   0.0156
+  ],
+  "precision": [
+   0.7036,
+   0.0017
+  ],
+  "ordinary_flag_rate": [
+   0.0069,
+   0.0011
+  ],
+  "literal_flag_rate": [
+   0.0134,
+   0.0032
+  ]
+ },
+ "thresholds_raw": {
+  "fail": {
+   "cmdi": 0.15,
+   "path": 0.75,
+   "ssrf": 0.97,
+   "codei": 0.33,
+   "sqli": 0.61,
+   "deser": 0.73
+  },
+  "review": {
+   "cmdi": 0.03,
+   "path": 0.32,
+   "ssrf": 0.39,
+   "codei": 0.02,
+   "sqli": 0.03,
+   "deser": 0.06
+  }
+ },
+ "marketplace_thresholds": {
+  "review": 0.4,
+  "fail": 0.75
+ },
+ "oof_at_fail": {
+  "per_class": {
+   "cmdi": {
+    "n_pos": 268,
+    "pr_auc": 0.8735,
+    "recall": 0.9291
+   },
+   "path": {
+    "n_pos": 443,
+    "pr_auc": 0.6815,
+    "recall": 0.5892
+   },
+   "ssrf": {
+    "n_pos": 145,
+    "pr_auc": 0.568,
+    "recall": 0.1862
+   },
+   "codei": {
+    "n_pos": 122,
+    "pr_auc": 0.8345,
+    "recall": 0.8689
+   },
+   "sqli": {
+    "n_pos": 128,
+    "pr_auc": 0.7545,
+    "recall": 0.6953
+   },
+   "deser": {
+    "n_pos": 107,
+    "pr_auc": 0.8243,
+    "recall": 0.9065
+   }
+  },
+  "pr_auc_macro": 0.7561,
+  "any_pr_auc": 0.7668,
+  "any_roc_auc": 0.9465,
+  "threshold": 0.75,
+  "recall": 0.6834,
+  "precision": 0.7291,
+  "tp": 829,
+  "fp": 308,
+  "fn": 384,
+  "top_class_correct": 0.9831,
+  "ordinary_flag_rate": 0.0058,
+  "literal_flag_rate": 0.0109
+ },
+ "oof_at_review": {
+  "per_class": {
+   "cmdi": {
+    "n_pos": 268,
+    "pr_auc": 0.8735,
+    "recall": 0.9627
+   },
+   "path": {
+    "n_pos": 443,
+    "pr_auc": 0.6815,
+    "recall": 0.8713
+   },
+   "ssrf": {
+    "n_pos": 145,
+    "pr_auc": 0.568,
+    "recall": 0.7586
+   },
+   "codei": {
+    "n_pos": 122,
+    "pr_auc": 0.8345,
+    "recall": 0.9344
+   },
+   "sqli": {
+    "n_pos": 128,
+    "pr_auc": 0.7545,
+    "recall": 0.8984
+   },
+   "deser": {
+    "n_pos": 107,
+    "pr_auc": 0.8243,
+    "recall": 0.9907
+   }
+  },
+  "pr_auc_macro": 0.7561,
+  "any_pr_auc": 0.7668,
+  "any_roc_auc": 0.9465,
+  "threshold": 0.4,
+  "recall": 0.8978,
+  "precision": 0.5503,
+  "tp": 1089,
+  "fp": 890,
+  "fn": 124,
+  "top_class_correct": 0.9697,
+  "ordinary_flag_rate": 0.0342,
+  "literal_flag_rate": 0.0545
+ },
+ "final_train": {
+  "tag": "final",
+  "train_rows": 6109,
+  "train_windows": 7933,
+  "best_epoch": 5,
+  "minutes": 35.8,
+  "history": [],
+  "trainable": 5903622
+ },
+ "tests": {
+  "test_fresh_cmdi": {
+   "at_fail": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 12,
+      "pr_auc": 0.9833,
+      "recall": 0.9167
+     }
+    },
+    "pr_auc_macro": 0.9833,
+    "any_pr_auc": 0.9722,
+    "any_roc_auc": 0.9444,
+    "threshold": 0.75,
+    "recall": 0.9167,
+    "precision": 1.0,
+    "tp": 11,
+    "fp": 0,
+    "fn": 1,
+    "top_class_correct": 1.0
+   },
+   "at_review": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 12,
+      "pr_auc": 0.9833,
+      "recall": 0.9167
+     }
+    },
+    "pr_auc_macro": 0.9833,
+    "any_pr_auc": 0.9722,
+    "any_roc_auc": 0.9444,
+    "threshold": 0.4,
+    "recall": 0.9167,
+    "precision": 1.0,
+    "tp": 11,
+    "fp": 0,
+    "fn": 1,
+    "top_class_correct": 1.0
+   }
+  },
+  "test_v6": {
+   "at_fail": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 23,
+      "pr_auc": 1.0,
+      "recall": 1.0
+     }
+    },
+    "pr_auc_macro": 1.0,
+    "any_pr_auc": 0.9965,
+    "any_roc_auc": 0.996,
+    "threshold": 0.75,
+    "recall": 1.0,
+    "precision": 0.92,
+    "tp": 23,
+    "fp": 2,
+    "fn": 0,
+    "top_class_correct": 1.0
+   },
+   "at_review": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 23,
+      "pr_auc": 1.0,
+      "recall": 1.0
+     }
+    },
+    "pr_auc_macro": 1.0,
+    "any_pr_auc": 0.9965,
+    "any_roc_auc": 0.996,
+    "threshold": 0.4,
+    "recall": 1.0,
+    "precision": 0.8519,
+    "tp": 23,
+    "fp": 4,
+    "fn": 0,
+    "top_class_correct": 1.0
+   }
+  },
+  "test_mcp_new": {
+   "at_fail": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 4,
+      "pr_auc": 1.0,
+      "recall": 1.0
+     },
+     "path": {
+      "n_pos": 25,
+      "pr_auc": 0.5426,
+      "recall": 0.24
+     },
+     "ssrf": {
+      "n_pos": 18,
+      "pr_auc": 0.5439,
+      "recall": 0.3333
+     },
+     "codei": {
+      "n_pos": 5,
+      "pr_auc": 0.6472,
+      "recall": 0.6
+     },
+     "sqli": {
+      "n_pos": 29,
+      "pr_auc": 0.9814,
+      "recall": 0.7931
+     }
+    },
+    "pr_auc_macro": 0.743,
+    "any_pr_auc": 0.8388,
+    "any_roc_auc": 0.8037,
+    "threshold": 0.75,
+    "recall": 0.5185,
+    "precision": 0.8571,
+    "tp": 42,
+    "fp": 7,
+    "fn": 39,
+    "top_class_correct": 0.9762
+   },
+   "at_review": {
+    "per_class": {
+     "cmdi": {
+      "n_pos": 4,
+      "pr_auc": 1.0,
+      "recall": 1.0
+     },
+     "path": {
+      "n_pos": 25,
+      "pr_auc": 0.5426,
+      "recall": 0.68
+     },
+     "ssrf": {
+      "n_pos": 18,
+      "pr_auc": 0.5439,
+      "recall": 0.6111
+     },
+     "codei": {
+      "n_pos": 5,
+      "pr_auc": 0.6472,
+      "recall": 0.6
+     },
+     "sqli": {
+      "n_pos": 29,
+      "pr_auc": 0.9814,
+      "recall": 0.9655
+     }
+    },
+    "pr_auc_macro": 0.743,
+    "any_pr_auc": 0.8388,
+    "any_roc_auc": 0.8037,
+    "threshold": 0.4,
+    "recall": 0.7778,
+    "precision": 0.7159,
+    "tp": 63,
+    "fp": 25,
+    "fn": 18,
+    "top_class_correct": 0.9683
+   },
+   "per_repo": {
+    "roomi-fields/notebooklm-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 1
+    },
+    "that1drifter/browse-mcp": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 0,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "chromedevtools/chrome-devtools-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "ooples/token-optimizer-mcp": {
+     "n": 8,
+     "vuln": 4,
+     "caught_fail": 4,
+     "caught_review": 4,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "samanhappy/mcphub": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "czlonkowski/n8n-mcp": {
+     "n": 10,
+     "vuln": 5,
+     "caught_fail": 1,
+     "caught_review": 5,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 5
+    },
+    "mobile-next/mobile-mcp": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "modelcontextprotocol/servers": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 0,
+     "caught_review": 1,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 2
+    },
+    "sooperset/mcp-atlassian": {
+     "n": 14,
+     "vuln": 7,
+     "caught_fail": 0,
+     "caught_review": 5,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "ahujasid/blender-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 1
+    },
+    "haris-musa/excel-mcp-server": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "contentful/contentful-mcp-server": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 1
+    },
+    "agentfront/frontmcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "sorlen008/desktopcommandermcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "zcaceres/markdownify-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 0,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "chainlit/chainlit": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 0,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "pipeboard-co/meta-ads-mcp": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 1,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "qwed-ai/qwed-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 0,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "ibm/mcp-context-forge": {
+     "n": 7,
+     "vuln": 4,
+     "caught_fail": 3,
+     "caught_review": 3,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 1
+    },
+    "ondata/ckan-mcp-server": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 1,
+     "caught_review": 2,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "wolfe-jam/claude-faf-mcp": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 1,
+     "false_alarms_fail": 1,
+     "false_alarms_review": 1
+    },
+    "fadelabs/phantom": {
+     "n": 4,
+     "vuln": 2,
+     "caught_fail": 0,
+     "caught_review": 1,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 1
+    },
+    "mervinpraison/praisonai": {
+     "n": 12,
+     "vuln": 6,
+     "caught_fail": 1,
+     "caught_review": 2,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    },
+    "apache/doris-mcp-server": {
+     "n": 58,
+     "vuln": 29,
+     "caught_fail": 23,
+     "caught_review": 28,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 7
+    },
+    "apify/apify-mcp-server": {
+     "n": 2,
+     "vuln": 1,
+     "caught_fail": 0,
+     "caught_review": 0,
+     "false_alarms_fail": 0,
+     "false_alarms_review": 0
+    }
+   }
+  }
+ },
+ "wild": {
+  "n": 23010,
+  "flag_rate_at_fail": 0.0927,
+  "flag_rate_at_review": 0.2126,
+  "by_api_use": {
+   "risky": {
+    "n": 19153,
+    "fail": 0.1096,
+    "review": 0.2492
+   },
+   "risky_literal": {
+    "n": 857,
+    "fail": 0.0198,
+    "review": 0.0467
+   },
+   "ordinary": {
+    "n": 3000,
+    "fail": 0.0057,
+    "review": 0.0267
+   }
+  },
+  "repo_level": {
+   "repos": 46,
+   "fail": 0.8913,
+   "review": 1.0
+  },
+  "top_flagged": [
+   {
+    "id": "corpus-bc197c79a06db1e0",
+    "repo": "openagentplatform/dive",
+    "func": "extract",
+    "url": "https://github.com/OpenAgentPlatform/Dive/blob/5fb62b91b55c4b781af71e43750574a2a1642416/scripts/download-uv.ts#L88-L128",
+    "score": 0.9996088506989711,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-73fb9eb151f32165",
+    "repo": "google-gemini/gemini-cli",
+    "func": "fetchHistoricalData",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/aggregate_evals.js#L86-L145",
+    "score": 0.9995462692292616,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e7eed566ba263411",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getVersionFromNPM",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L87-L97",
+    "score": 0.9995411898111759,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-360de74da341e760",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "callValidateComposition",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/shared/python-bridge.ts#L27-L64",
+    "score": 0.9995159032503361,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-994b63966eb3113f",
+    "repo": "basicmachines-co/basic-memory",
+    "func": "registerCommands",
+    "url": "https://github.com/basicmachines-co/basic-memory/blob/f9875cf5e4e12f5a85fd9f9120703ed9990c68ae/integrations/openclaw/commands/slash.ts#L10-L107",
+    "score": 0.9995145206247016,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-022235e5f7bfa203",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getLatestReleaseInfo",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/releasing/create-patch-pr.js#L276-L292",
+    "score": 0.9995092672287613,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-9c3427955a801b44",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "cloneSkillsRepo",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/skills/clone.ts#L37-L70",
+    "score": 0.9994993110711891,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-521bb9ad9b14190c",
+    "repo": "google-gemini/gemini-cli",
+    "func": "fetchNightlyHistory",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/eval_utils.js#L94-L136",
+    "score": 0.999497683907468,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-6ece74fdd3d3d653",
+    "repo": "basicmachines-co/basic-memory",
+    "func": "registerCommands.handler",
+    "url": "https://github.com/basicmachines-co/basic-memory/blob/f9875cf5e4e12f5a85fd9f9120703ed9990c68ae/integrations/openclaw/commands/slash.ts#L18-L40",
+    "score": 0.9994793645194959,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-b16f7c75bab08308",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "launchLocalGui",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/SUMO-AI-MCP/scripts/launch_local_gui.js#L17-L42",
+    "score": 0.9994707359950818,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-9efc5858df180892",
+    "repo": "google-gemini/gemini-cli",
+    "func": "doesVersionExist",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L214-L261",
+    "score": 0.9994610576813773,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-969609e9053323c9",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getChangedFiles",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/lint.js#L258-L284",
+    "score": 0.999459799541919,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-671cf4b9c206e901",
+    "repo": "google-gemini/gemini-cli",
+    "func": "main",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/cleanup-branches.ts#L18-L175",
+    "score": 0.9994581205560613,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ecdd081760f2ee11",
+    "repo": "mouseww/anything-analyzer",
+    "func": "commandExists",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/cert-installer.ts#L43-L50",
+    "score": 0.9994381650947176,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-346a20687393c04b",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "isDaemonReachable",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/daemon-client.ts#L272-L344",
+    "score": 0.9994215530949272,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-43909a573c73f8f0",
+    "repo": "oraios/serena",
+    "func": "gitCommitWithMessageFromFile",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L54-L58",
+    "score": 0.9993979086233682,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-331b9b188279b580",
+    "repo": "google-gemini/gemini-cli",
+    "func": "main",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/releasing/create-patch-pr.js#L13-L249",
+    "score": 0.9993927934545123,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-30010230410135c0",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getAllVersionsFromNPM",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L99-L108",
+    "score": 0.9993815525018952,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-56619ebbb888b2fd",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "main",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/typescript-preflight.ts#L42-L163",
+    "score": 0.9993761051459781,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-5584b156b77249aa",
+    "repo": "google-gemini/gemini-cli",
+    "func": "checkRelease",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/vscode-ide-companion/scripts/check-vscode-release.js#L9-L97",
+    "score": 0.9993502565961974,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-12173390ab76826c",
+    "repo": "google-gemini/gemini-cli",
+    "func": "buildImage",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/build_sandbox.js#L132-L188",
+    "score": 0.9993460194359225,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f633b5c14e7317b9",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "generateRoutes",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/SUMO-AI-MCP/src/modules/sumo/sumo.tools.ts#L240-L309",
+    "score": 0.999336611874784,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-50b6663903b44a7b",
+    "repo": "google-gemini/gemini-cli",
+    "func": "branchExists",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/releasing/create-patch-pr.js#L267-L274",
+    "score": 0.999324307213715,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8f6e8d006d0807df",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "disableStartupApp",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/startup.tools.ts#L30-L55",
+    "score": 0.9993213585334924,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f0005cbdd34d1031",
+    "repo": "oraios/serena",
+    "func": "restore_ignored_files",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L277-L309",
+    "score": 0.9993177235189078,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-806d9de3eeeaa522",
+    "repo": "google-gemini/gemini-cli",
+    "func": "main",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/run_eval_regression.js#L22-L102",
+    "score": 0.9993026641547513,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-24b740f7b4063b5a",
+    "repo": "oraios/serena",
+    "func": "commit_version_change",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/scripts/bump_version.py#L107-L111",
+    "score": 0.9993003415308973,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e96d510fd10aeab9",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "generateNetwork",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/SUMO-AI-MCP/src/modules/sumo/sumo.tools.ts#L144-L190",
+    "score": 0.9992984117979864,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-91ada6ce1bf9b353",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getAuthors",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/tools/gemini-cli-bot/metrics/scripts/domain_expertise.ts#L64-L81",
+    "score": 0.9992962457997348,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-27b03c4c869ecfbf",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "setPowerPlan",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/boost.tools.ts#L8-L28",
+    "score": 0.9992961681280772,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-0bc3d1b347ce8a50",
+    "repo": "google-gemini/gemini-cli",
+    "func": "main",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/changed_prompt.js#L23-L101",
+    "score": 0.9992934065811854,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8a157aa14136e4c2",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runGh",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/.gemini/skills/ci/scripts/ci.mjs#L28-L36",
+    "score": 0.9992908491396576,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-bdba5a0f0d4e21b7",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "queryDaemonSync",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/daemon-client.ts#L539-L600",
+    "score": 0.9992894021921592,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e80b3028987f7a09",
+    "repo": "oraios/serena",
+    "func": "pull",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L116-L191",
+    "score": 0.9992869059391816,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-0bcd4683faff2237",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "enableStartupApp",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/startup.tools.ts#L57-L78",
+    "score": 0.9992846640148451,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-a77f05f271a6809f",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "checkLatency",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/network.tools.ts#L28-L43",
+    "score": 0.9992805352575288,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-da25c552885ca273",
+    "repo": "google-gemini/gemini-cli",
+    "func": "monitor",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/.gemini/skills/ci/scripts/ci.mjs#L101-L276",
+    "score": 0.9992801628169886,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-70a25c3e9d9f2ceb",
+    "repo": "openagentplatform/dive",
+    "func": "setAppImageAutoLaunch",
+    "url": "https://github.com/OpenAgentPlatform/Dive/blob/5fb62b91b55c4b781af71e43750574a2a1642416/electron/main/platform/appimage.ts#L5-L42",
+    "score": 0.9992800011837091,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-66d45cb2a5622fd0",
+    "repo": "netease-youdao/lobsterai",
+    "func": "execAsync",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/appUpdateInstaller.ts#L66-L76",
+    "score": 0.999273486035845,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-a2b8d0deef4b8836",
+    "repo": "mouseww/anything-analyzer",
+    "func": "execPromise",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/cert-installer.ts#L24-L31",
+    "score": 0.9992463752007855,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ad7bbff0ca199f18",
+    "repo": "netease-youdao/lobsterai",
+    "func": "readWindowsRegistryPathValue",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/coworkUtil.ts#L163-L182",
+    "score": 0.9992452686176608,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ee3d978a8a6ef910",
+    "repo": "google-gemini/gemini-cli",
+    "func": "run",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/.gemini/skills/pr-address-comments/scripts/fetch-pr-info.js#L16-L26",
+    "score": 0.9991938555778721,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e0462bbf81da2dd7",
+    "repo": "google-gemini/gemini-cli",
+    "func": "run",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/version.js#L13-L16",
+    "score": 0.9991872199898222,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-fc60bd3d7d2e3318",
+    "repo": "google-gemini/gemini-cli",
+    "func": "executeCommandHook",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/core/src/hooks/hookRunner.ts#L307-L508",
+    "score": 0.999186585508474,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ab238d1e2e4baa97",
+    "repo": "mouseww/anything-analyzer",
+    "func": "execPromise",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/system-proxy.ts#L19-L26",
+    "score": 0.9991787862850268,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-1c5d1079990cb470",
+    "repo": "hangwin/mcp-chrome",
+    "func": "tryRegisterUserLevelHost",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/scripts/utils.ts#L302-L388",
+    "score": 0.9991784332047176,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f70767c093582ca8",
+    "repo": "google-gemini/gemini-cli",
+    "func": "isVersionDeprecated",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L110-L122",
+    "score": 0.9991680589343523,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-7614a6667bf517ee",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "ensureVenvExists",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/Markidian_mcp/src/utils.ts#L54-L101",
+    "score": 0.9991667275433191,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-cdfce27423c4491c",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getLatestTag",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L59-L85",
+    "score": 0.9991581986937632,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f9acf03907e4ad40",
+    "repo": "timescale/pg-aiguide",
+    "func": "checkout_tag",
+    "url": "https://github.com/timescale/pg-aiguide/blob/187be00d317a51210c132010d947f4546ffb5eef/ingest/postgres_docs.py#L76-L85",
+    "score": 0.9991439207444333,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-24511cb91c3d94e6",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "start_async",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/repoprompt_async.py#L57-L80",
+    "score": 0.999121895801877,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f8fb1e0a94a90644",
+    "repo": "hangwin/mcp-chrome",
+    "func": "openLinuxPicker",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/agent/directory-picker.ts#L120-L160",
+    "score": 0.9991181142622965,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-da1537c7e9798505",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "runGuiSimulation",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/SUMO-AI-MCP/src/modules/sumo/sumo.tools.ts#L344-L399",
+    "score": 0.9991160028937468,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-25919f0f0c729280",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runCommand",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/deflake.js#L28-L50",
+    "score": 0.9991098835432614,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ab3cb416c13364f7",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getProcessInfo",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/core/src/ide/process-utils.ts#L88-L114",
+    "score": 0.9990710621965511,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ac407dc73dd70b8e",
+    "repo": "google-gemini/gemini-cli",
+    "func": "run",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/tools/gemini-cli-bot/metrics/scripts/backlog_age.ts#L13-L57",
+    "score": 0.9990534773127627,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-b84a763f05e60d6b",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "emptyRecycleBin",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/cleanup.tools.ts#L46-L92",
+    "score": 0.9989750174347596,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-c431a12502b84ce3",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "setProcessPriority",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/system.tools.ts#L176-L198",
+    "score": 0.9989320696273738,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8e4c2c80a893e84c",
+    "repo": "hangwin/mcp-chrome",
+    "func": "registerWithElevatedPermissions",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/scripts/utils.ts#L404-L535",
+    "score": 0.9989160899745892,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-0e67570f6d0590b7",
+    "repo": "mouseww/anything-analyzer",
+    "func": "enableMacOS",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/system-proxy.ts#L193-L206",
+    "score": 0.9989099484780576,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8250a43d76a26890",
+    "repo": "google-gemini/gemini-cli",
+    "func": "run",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/releasing/create-patch-pr.js#L251-L265",
+    "score": 0.9988749600327507,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-3f0cb63649dfd50b",
+    "repo": "google-gemini/gemini-cli",
+    "func": "cleanup",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/test-utils/src/test-rig.ts#L986-L1053",
+    "score": 0.9988645868379467,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-bad56e024e4d3470",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "runHeadlessSimulation",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/SUMO-AI-MCP/src/modules/sumo/sumo.tools.ts#L311-L342",
+    "score": 0.9988452239918789,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-b8f218c7b4169345",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "runNpmInstall",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/install.ts#L27-L33",
+    "score": 0.9988178454665444,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-038432a1cd74321d",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runTests",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/run_regression_check.js#L26-L53",
+    "score": 0.9988118223788928,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-bc32d9f79923479d",
+    "repo": "oraios/serena",
+    "func": "call",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L18-L20",
+    "score": 0.9988055322072753,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e2d25a6cd0f9b83d",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getNewEvalFiles",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/utils/eval-validate.ts#L261-L330",
+    "score": 0.9987718729072983,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-b02af880c966e28a",
+    "repo": "cortex-docs/cortex",
+    "func": "runGenerate",
+    "url": "https://github.com/cortex-docs/cortex/blob/db50bf4e30efe3442cf248be5f46bc496a741ced/packages/docs-ui/scripts/dev.mjs#L150-L161",
+    "score": 0.9987026448812611,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-9b514b2c226c8be4",
+    "repo": "netease-youdao/lobsterai",
+    "func": "on:data",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/im/imGatewayManager.ts#L3004-L3036",
+    "score": 0.9986859839285274,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-7c41c671f87c58e4",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "commandExists",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/skills/detect-agents.ts#L14-L22",
+    "score": 0.9986688932777428,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-37ad1e7583611431",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "run_cmd",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/repoprompt_async.py#L45-L48",
+    "score": 0.9986263295575537,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-82672748deb49145",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "ripgrepFallback",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/smart-search-router.ts#L97-L115",
+    "score": 0.9986217923125651,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-40b9b8441ce24e9d",
+    "repo": "oraios/serena",
+    "func": "release",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/scripts/bump_version.py#L41-L73",
+    "score": 0.9986152759166169,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f667d0192016fcc5",
+    "repo": "google-gemini/gemini-cli",
+    "func": "start_sandbox",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/cli/src/utils/sandbox.ts#L55-L1031",
+    "score": 0.9986021536427919,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-7d77180231b35486",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "runLeanCompiler",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/compiler-in-the-loop.ts#L71-L110",
+    "score": 0.9985912306767678,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-a80c23e1e41e9c82",
+    "repo": "mouseww/anything-analyzer",
+    "func": "installLinux",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/cert-installer.ts#L145-L184",
+    "score": 0.9985597493524716,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-3de61bf1125b173e",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "killProcess",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/system.tools.ts#L139-L174",
+    "score": 0.9985341989009444,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8a1bbad68ceb3896",
+    "repo": "galaxy-dawn/claude-scholar",
+    "func": "runCommand",
+    "url": "https://github.com/Galaxy-Dawn/claude-scholar/blob/903787345d6aec134086afa2b97715a78fbde519/scripts/lib/utils.js#L70-L85",
+    "score": 0.99846339316625,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f73efbdef7b2adb3",
+    "repo": "openagentplatform/dive",
+    "func": "getUnixSystemPath",
+    "url": "https://github.com/OpenAgentPlatform/Dive/blob/5fb62b91b55c4b781af71e43750574a2a1642416/electron/main/util.ts#L96-L133",
+    "score": 0.9984523521326081,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-a1d8ac27a4dd4af9",
+    "repo": "google-gemini/gemini-cli",
+    "func": "findCommand",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/core/src/ide/ide-installer.ts#L24-L146",
+    "score": 0.9984332960565555,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-d3dd1a34c85b1ab3",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runCmd",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/cleanup-branches.ts#L11-L16",
+    "score": 0.9981932408534783,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-aca47ef378832a46",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "callPatternInference",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/.claude/hooks/src/shared/python-bridge.ts#L72-L110",
+    "score": 0.9980605571242337,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-6d844e599f9083f2",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "runOutput",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/scripts/bump-beta.mjs#L53-L59",
+    "score": 0.9980584586046797,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8ebd47943f593299",
+    "repo": "cortex-docs/cortex",
+    "func": "initTestProject",
+    "url": "https://github.com/cortex-docs/cortex/blob/db50bf4e30efe3442cf248be5f46bc496a741ced/packages/docs-ui/scripts/dev.mjs#L40-L148",
+    "score": 0.9979659101077695,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-cd94859e8c942214",
+    "repo": "oraios/serena",
+    "func": "push",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L193-L256",
+    "score": 0.9979238518152506,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-e38d75156dc86258",
+    "repo": "onecli/onecli",
+    "func": "buildGuestPayload",
+    "url": "https://github.com/onecli/onecli/blob/5ce79708cad61ed26d26a35e5c478fff6eef7d29/apps/ssh-terminator/src/relay.ts#L42-L52",
+    "score": 0.9979095714527833,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-06b6dd4938cff5ec",
+    "repo": "hangwin/mcp-chrome",
+    "func": "verifyWindowsRegistryEntry",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/scripts/utils.ts#L254-L282",
+    "score": 0.9976728887279556,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-ab8f36339fcfbd4d",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runCommand",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/sync_project_dry_run.js#L28-L38",
+    "score": 0.9974925938807196,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-1fd61bbd7faacd29",
+    "repo": "netease-youdao/lobsterai",
+    "func": "listGitInstallPathsFromRegistry",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/coworkUtil.ts#L297-L322",
+    "score": 0.9974638066796332,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-7d762e98845a0a02",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "devCommand",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/dev.ts#L177-L439",
+    "score": 0.9974238641295705,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-514d0f2c1b232b11",
+    "repo": "google-gemini/gemini-cli",
+    "func": "fetchFailuresViaApi",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/.gemini/skills/ci/scripts/ci.mjs#L38-L48",
+    "score": 0.9973505383699227,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-2ec8402fb68db781",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1203-L1217",
+    "score": 0.9972914972607888,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-347ca0af84d631f1",
+    "repo": "netease-youdao/lobsterai",
+    "func": "installMacDmg",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/appUpdateInstaller.ts#L789-L908",
+    "score": 0.9972516178562019,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-1914f82375f47af3",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "createComponentFromNextRoute",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/core/src/ui-next/index.ts#L143-L242",
+    "score": 0.9972482896568193,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-eb6e772a73bf2a16",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1505-L1518",
+    "score": 0.9971049926402009,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-538a236c0e5a19a1",
+    "repo": "google-gemini/gemini-cli",
+    "func": "getUserLinuxClipboardTool",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/cli/src/ui/utils/clipboardUtils.ts#L38-L59",
+    "score": 0.9971047077192953,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-efd768b8f861bb23",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1567-L1579",
+    "score": 0.99709592874101,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-330c585b9f7fb893",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_nquad",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1186-L1231",
+    "score": 0.9969849211303783,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-844c781f2f4157cd",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_differential_evolution",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L546-L601",
+    "score": 0.9969743182839081,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-8b36693f118d0d60",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1112-L1125",
+    "score": 0.9969662421675234,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-6767944a786ff206",
+    "repo": "nevamind-ai/memu",
+    "func": "run",
+    "url": "https://github.com/NevaMind-AI/memU/blob/dc7bda82b1f2a6429d9d1531ebdfd08d71e4e2b1/npm/bin/memu.js#L21-L28",
+    "score": 0.9969223967308383,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-67d7343b783140cd",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L784-L797",
+    "score": 0.9969213437849893,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-fb6be148a8e500da",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_brute",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L760-L817",
+    "score": 0.9968949737152006,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-357eb80d1c4ddb44",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1439-L1455",
+    "score": 0.9968558455865759,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-147442feacbc39e8",
+    "repo": "hangwin/mcp-chrome",
+    "func": "openWindowsPicker",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/agent/directory-picker.ts#L83-L115",
+    "score": 0.9968519464210321,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-de40e893c4524d7a",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_curve_fit",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L357-L430",
+    "score": 0.9968513528252109,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-0858702d1170f16b",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "model",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L381-L397",
+    "score": 0.9968474335794266,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-224d412faa2a9e5a",
+    "repo": "netease-youdao/lobsterai",
+    "func": "listWindowsCommandPaths",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/coworkUtil.ts#L284-L295",
+    "score": 0.9968270373703298,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-64c1915bcd3f0b80",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_direct",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L906-L960",
+    "score": 0.99681920600945,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-c23c55a4e1ed2884",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1035-L1047",
+    "score": 0.9967888901107907,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-0fa423426d0b60ae",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1373-L1389",
+    "score": 0.9967799824081554,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-539566bde32a0896",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_dual_annealing",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L658-L704",
+    "score": 0.9967749004649614,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-feaeabb70ec1aad8",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_dblquad",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1007-L1078",
+    "score": 0.996771150949175,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-2ffc6ce4d6296907",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "retrieve",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/vector/lancedb/LanceDBAdapter.py#L274-L299",
+    "score": 0.9967468287740906,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-dc1e08dd1b7d39c9",
+    "repo": "mouseww/anything-analyzer",
+    "func": "sudoExec",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/cert-installer.ts#L33-L41",
+    "score": 0.9967264326930286,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-077a2d75fb254679",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L572-L582",
+    "score": 0.9967047667167697,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-8628800f2e6a13d2",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "parse_constraint",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/z3_solve.py#L79-L111",
+    "score": 0.9967039972655977,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-1cacd00970c90a8b",
+    "repo": "netease-youdao/lobsterai",
+    "func": "evaluate",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/SKILLs/web-search/server/playwright/operations.ts#L79-L89",
+    "score": 0.9965798340363585,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-bdfcc1aea081c0e5",
+    "repo": "mouseww/anything-analyzer",
+    "func": "isEnabled",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/system-proxy.ts#L80-L116",
+    "score": 0.9965382555700388,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8129c031e4714601",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "q",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1153-L1165",
+    "score": 0.9965259948297349,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-eae8d5cccbefb78d",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "h",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1063-L1074",
+    "score": 0.9964891699464614,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-89688dbdfe6c4813",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "r",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1167-L1179",
+    "score": 0.9964618183911356,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-1f89ee1e0a8e56ed",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_least_squares",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L433-L482",
+    "score": 0.9964284327745695,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-9c7474edc22cde37",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "residuals",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L452-L462",
+    "score": 0.996413067536368,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-e667492804ed855e",
+    "repo": "hangwin/mcp-chrome",
+    "func": "detectInstalledBrowsers",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/scripts/browser-config.ts#L203-L255",
+    "score": 0.9963998182276146,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-218b9eb4209ccbe2",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "run",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/scripts/bump-beta.mjs#L42-L51",
+    "score": 0.9963751562007217,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-60ff53f824308f15",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_shgo",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L707-L757",
+    "score": 0.9963660220544344,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-14526672ae08befd",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_basinhopping",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L604-L655",
+    "score": 0.9963321588733635,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-2555ec0b57db1417",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_funm",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L3035-L3053",
+    "score": 0.9962630726891994,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-b99cd82c688543c1",
+    "repo": "mouseww/anything-analyzer",
+    "func": "disableMacOS",
+    "url": "https://github.com/Mouseww/anything-analyzer/blob/6ae7becb256428407e3297f9fa35611ef8711e01/src/main/proxy/system-proxy.ts#L208-L216",
+    "score": 0.9962612916193305,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-72f2770d5531b069",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L629-L643",
+    "score": 0.9962257702594641,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-92281a0042daa3f8",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_solve_bvp",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1474-L1544",
+    "score": 0.9961951273251289,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-a189a6bcaddfbfa5",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "g",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1050-L1061",
+    "score": 0.9961200630995596,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-85b9415760ad210b",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_odeint",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1339-L1400",
+    "score": 0.9961075346899827,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-044944f366613af9",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runSensitiveKeywordLinter",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/lint.js#L245-L322",
+    "score": 0.996084289190929,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-3f39369ca3838c49",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_quad_vec",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1547-L1595",
+    "score": 0.9960158315337819,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-fa1ff0c3a13734a0",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_tplquad",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1081-L1183",
+    "score": 0.9959717486222451,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-9de73f7e02768fee",
+    "repo": "vibheksoni/stealth-browser-mcp",
+    "func": "create_python_binding",
+    "url": "https://github.com/vibheksoni/stealth-browser-mcp/blob/518e74ab962e0772477e19b8cc89b7f348f03466/src/server.py#L2665-L2697",
+    "score": 0.9957548247439645,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-e16564e6523441c8",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "get_result",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/repoprompt_async.py#L106-L123",
+    "score": 0.9956741988190932,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-87e22e1f4238074e",
+    "repo": "netease-youdao/lobsterai",
+    "func": "runOrFail",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/scripts/build-dsh-runtime.cjs#L125-L140",
+    "score": 0.9956116134666859,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f3d32c67666e3667",
+    "repo": "google-gemini/gemini-cli",
+    "func": "run",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/sync_project_dry_run.js#L149-L246",
+    "score": 0.9955433442534942,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-607394674895d82f",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "f",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L156-L166",
+    "score": 0.9954912410765908,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-843ad292268d4e85",
+    "repo": "oraios/serena",
+    "func": "execute",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/repo_dir_sync.py#L23-L37",
+    "score": 0.9953907258746157,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-54f11e58d3b40c3d",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_fsolve",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L219-L264",
+    "score": 0.9953858715322627,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-a81c769698b1c067",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_root",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L129-L178",
+    "score": 0.9952788535149568,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-1b80acb129683fca",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "parse_callable",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/math_base.py#L476-L536",
+    "score": 0.9952243416181479,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-90e747d52fe309ce",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "bc_func",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1520-L1534",
+    "score": 0.9951163325869926,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-3661b7a7a2a184fe",
+    "repo": "google-gemini/gemini-cli",
+    "func": "commandExists",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/sandbox_command.js#L75-L91",
+    "score": 0.9949527763200561,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-2080f886741c4017",
+    "repo": "hangwin/mcp-chrome",
+    "func": "executeExtraction.func",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/actions/handlers/extract.ts#L90-L108",
+    "score": 0.9948154153084832,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-d3fa7fefc29738ee",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "getBatteryReport",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/sample-apps/ApexTune-mcp-server-project/src/boost.tools.ts#L30-L45",
+    "score": 0.9946364180685255,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-071ce59360b33b7c",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "drop_graph",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/graph/neo4j_driver/adapter.py#L596-L600",
+    "score": 0.9944498030041795,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-6fdb613e5847bec5",
+    "repo": "hangwin/mcp-chrome",
+    "func": "injectJsPersistent.func",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/tools/browser/userscript.ts#L277-L284",
+    "score": 0.994270398746187,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-7c4c1c90147021b1",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "get_data",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/relational/sqlalchemy/SqlAlchemyAdapter.py#L318-L331",
+    "score": 0.99404057935362,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-49c97d9d617ed937",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "cmd_solve_ivp",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/cc_math/scipy_compute.py#L1403-L1471",
+    "score": 0.9939927923695082,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-d38297dce7a56cb5",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "execSilent",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/dev.ts#L155-L166",
+    "score": 0.9939183237480427,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f03cb844ec7eab2d",
+    "repo": "hangwin/mcp-chrome",
+    "func": "run",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/nodes/extract.ts#L6-L46",
+    "score": 0.993767924494825,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-d26e28584ddf9a28",
+    "repo": "cortex-docs/cortex",
+    "func": "parseContent",
+    "url": "https://github.com/cortex-docs/cortex/blob/db50bf4e30efe3442cf248be5f46bc496a741ced/packages/core/src/asyncapi/parser.ts#L123-L128",
+    "score": 0.9937076553630428,
+    "class": "deser"
+   },
+   {
+    "id": "corpus-c52f695e4a11bee9",
+    "repo": "netease-youdao/lobsterai",
+    "func": "testEmailConnectivity",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/im/imGatewayManager.ts#L2941-L3131",
+    "score": 0.9936249001613369,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-b128ca1f19a532cd",
+    "repo": "google-gemini/gemini-cli",
+    "func": "parseArgs",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/run_regression_check.js#L72-L121",
+    "score": 0.9933564564136377,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-0486c9c2d4c982a2",
+    "repo": "google-gemini/gemini-cli",
+    "func": "runCommand",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/lint.js#L161-L183",
+    "score": 0.9933212781150879,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-8938e1bc523f566a",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "_full_database_ingestion",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/ingestion/pipeline_tasks/migrate_relational_database.py#L163-L274",
+    "score": 0.9928514651799891,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-94cc4176cbf647b5",
+    "repo": "hangwin/mcp-chrome",
+    "func": "executeScript.func",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/actions/handlers/script.ts#L105-L133",
+    "score": 0.9927618425654523,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-4d115ca68ee021b8",
+    "repo": "totec448-spec/chat-on-steroids",
+    "func": "run",
+    "url": "https://github.com/totec448-spec/chat-on-steroids/blob/81614aef85a0b67c75d8f2ffc0ca1a5f19db50d2/scripts/afterpack-macos-adhoc-seal.mjs#L46-L53",
+    "score": 0.9925572178393832,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-49b2cc173bf30f58",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "generateTypeFromExample",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/generate-types.ts#L205-L213",
+    "score": 0.992345530882328,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-82b1eb325a4a3f64",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "project_entire_graph",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/graph/neo4j_driver/adapter.py#L579-L594",
+    "score": 0.9919465165254617,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-697501c4ea4acfac",
+    "repo": "cortex-docs/cortex",
+    "func": "runCaptured",
+    "url": "https://github.com/cortex-docs/cortex/blob/db50bf4e30efe3442cf248be5f46bc496a741ced/packages/cli/src/commands/publish/registry-version.ts#L87-L105",
+    "score": 0.9919019677899541,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-48a919fe379b0335",
+    "repo": "hangwin/mcp-chrome",
+    "func": "run",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/nodes/script.ts#L6-L31",
+    "score": 0.9915699030928795,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-7ed8a4d819ad04a3",
+    "repo": "netease-youdao/lobsterai",
+    "func": "run",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/scripts/generate-tray-icons.js#L12-L20",
+    "score": 0.9914827120857503,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-256fcf5b5ebe8386",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "on:add",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/dev.ts#L379-L403",
+    "score": 0.9913080489137177,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-9cd2a3b557b49e29",
+    "repo": "usekaneo/kaneo",
+    "func": "command",
+    "url": "https://github.com/usekaneo/kaneo/blob/5d5ce5bef7a7976a831d889f0159f9c3012a65e8/scripts/ui-review-bot/core.mjs#L18-L26",
+    "score": 0.9911348772936275,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-460290ea616c75f2",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "migrate_documents",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/scripts/migrate_created_at.py#L354-L428",
+    "score": 0.9911161170147491,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-5a53679cde3bf596",
+    "repo": "google-gemini/gemini-cli",
+    "func": "main",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/releasing/patch-create-comment.js#L17-L384",
+    "score": 0.9910081022618344,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-027959d740a01b9d",
+    "repo": "hangwin/mcp-chrome",
+    "func": "openMacOSPicker",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/native-server/src/agent/directory-picker.ts#L57-L78",
+    "score": 0.9906983161630074,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-f5fd263dd2d4250f",
+    "repo": "hangwin/mcp-chrome",
+    "func": "injectJsPersistent.func",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/tools/browser/userscript.ts#L292-L317",
+    "score": 0.9905865876114338,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-093400f87e546a64",
+    "repo": "hangwin/mcp-chrome",
+    "func": "executeExtraction",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/actions/handlers/extract.ts#L18-L142",
+    "score": 0.990573005507342,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-f56e1fd474f19922",
+    "repo": "google-gemini/gemini-cli",
+    "func": "detectRollbackAndGetBaseline",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/scripts/get-release-version.js#L124-L212",
+    "score": 0.9902428546043378,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-a2e99f8788889c5e",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "get_degree_one_nodes",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/graph/kuzu/adapter.py#L1499-L1512",
+    "score": 0.9902409504736134,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-b5858816d90fce97",
+    "repo": "totec448-spec/chat-on-steroids",
+    "func": "catch:callback",
+    "url": "https://github.com/totec448-spec/chat-on-steroids/blob/81614aef85a0b67c75d8f2ffc0ca1a5f19db50d2/scripts/verify-shell-runtime.cjs#L81-L298",
+    "score": 0.9901275596717389,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-4c5822b022162a59",
+    "repo": "netease-youdao/lobsterai",
+    "func": "step",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/scripts/e2e-dsh-foundation.cjs#L37-L48",
+    "score": 0.9899912455674591,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-0a570f3a65687a34",
+    "repo": "agentdeskai/browser-tools-mcp",
+    "func": "readStorage",
+    "url": "https://github.com/AgentDeskAI/browser-tools-mcp/blob/99acee8d02f12f6e64dc7f33608bb34427ce90c7/chrome-extension/devtools.js#L620-L657",
+    "score": 0.9899768212858028,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-4f4877b2daee80cd",
+    "repo": "repowise-dev/repowise",
+    "func": "exec",
+    "url": "https://github.com/repowise-dev/repowise/blob/c3591a7ffbd4a2df227f0be3ad19414b5e10a98a/packages/vscode/src/core/cliRunner.ts#L65-L126",
+    "score": 0.9898501818365527,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-30c918768c03a601",
+    "repo": "oraios/serena",
+    "func": "load_yaml",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/src/serena/util/yaml.py#L67-L89",
+    "score": 0.9895540502945964,
+    "class": "deser"
+   },
+   {
+    "id": "corpus-762895ac2b162aa2",
+    "repo": "basicmachines-co/basic-memory",
+    "func": "find_related",
+    "url": "https://github.com/basicmachines-co/basic-memory/blob/f9875cf5e4e12f5a85fd9f9120703ed9990c68ae/src/basic_memory/services/context_service.py#L314-L445",
+    "score": 0.9890116359599941,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-631d925bffde1761",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "view_procedure",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/debug/procedure_cli.py#L61-L163",
+    "score": 0.9890098951776515,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-54f42997a6a5d5ea",
+    "repo": "hangwin/mcp-chrome",
+    "func": "executeScript",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/actions/handlers/script.ts#L92-L167",
+    "score": 0.9886304563776618,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-49555165048bc8da",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "create_table",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/relational/sqlalchemy/SqlAlchemyAdapter.py#L143-L161",
+    "score": 0.9885450062092198,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-eaeaaee4f7c336e7",
+    "repo": "bytebase/dbhub",
+    "func": "explainQuery",
+    "url": "https://github.com/bytebase/dbhub/blob/f7b31468be4ff0c70b1c662b3e535fe36f4dad06/src/connectors/oracle/index.ts#L889-L944",
+    "score": 0.9876093230828147,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-699abcf767c75de1",
+    "repo": "oraios/serena",
+    "func": "do_popen",
+    "url": "https://github.com/oraios/serena/blob/1de556f71569f3acfc0743e526dd60aca40a545e/src/solidlsp/util/subprocess_util.py#L231-L245",
+    "score": 0.9866483762116798,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-77e5dc35b73ed155",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "start_ui",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/api/v1/ui/ui.py#L247-L457",
+    "score": 0.9865318379530058,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-3456ab99bcf6d1a0",
+    "repo": "q00/ouroboros",
+    "func": "_yaml_mapping",
+    "url": "https://github.com/Q00/ouroboros/blob/f587795674999a09b51530779640730eda55b174/src/ouroboros/cli/runtime_activation.py#L339-L350",
+    "score": 0.9861307243555502,
+    "class": "deser"
+   },
+   {
+    "id": "corpus-099b540c334303cc",
+    "repo": "onecli/onecli",
+    "func": "buildSshConnectCommand",
+    "url": "https://github.com/onecli/onecli/blob/5ce79708cad61ed26d26a35e5c478fff6eef7d29/apps/web/src/lib/ssh-connect-command.ts#L21-L30",
+    "score": 0.985993434583059,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-35ea24b6222d7584",
+    "repo": "hangwin/mcp-chrome",
+    "func": "flush",
+    "url": "https://github.com/hangwin/mcp-chrome/blob/f48e71751e00bc09725c7e173423cff4f2ccd12a/app/chrome-extension/entrypoints/background/record-replay/engine/runners/after-script-queue.ts#L25-L87",
+    "score": 0.985854595566586,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-1eef36c19a892428",
+    "repo": "zipstack/unstract",
+    "func": "_bump_auto_increment_id",
+    "url": "https://github.com/Zipstack/unstract/blob/99dbcff5273b97315b41c66005bb820f6048625c/backend/migrating/v2/management/commands/migrate_to_v2.py#L321-L385",
+    "score": 0.9858509824113804,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-e7a2e83c3f360325",
+    "repo": "nitrocloudofficial/nitrostack",
+    "func": "generateTypesFromFiles",
+    "url": "https://github.com/nitrocloudofficial/nitrostack/blob/9b4511a04b86d41f2228953615907a5e9403dc49/typescript/packages/cli/src/commands/generate-types.ts#L74-L169",
+    "score": 0.985626739727935,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-af34ef6c706aadaf",
+    "repo": "vibheksoni/stealth-browser-mcp",
+    "func": "matches",
+    "url": "https://github.com/vibheksoni/stealth-browser-mcp/blob/518e74ab962e0772477e19b8cc89b7f348f03466/src/dynamic_hook_system.py#L119-L160",
+    "score": 0.9846192691588862,
+    "class": "codei"
+   },
+   {
+    "id": "corpus-a8212c36a3ef77b3",
+    "repo": "google-gemini/gemini-cli",
+    "func": "isCommandAvailable",
+    "url": "https://github.com/google-gemini/gemini-cli/blob/9b6e0265d16bbd29ca51e33c9e0c01dc4cec5e83/packages/core/src/tools/grep.ts#L350-L406",
+    "score": 0.9845437643174515,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-fe0c87916d835554",
+    "repo": "netease-youdao/lobsterai",
+    "func": "swapInstallWithUserPerms",
+    "url": "https://github.com/netease-youdao/LobsterAI/blob/1c20890672581321db4c9f21c6670ccc0bf03dfd/src/main/libs/appUpdateInstaller.ts#L683-L749",
+    "score": 0.9842926561913347,
+    "class": "cmdi"
+   },
+   {
+    "id": "corpus-d1504ec774886dbe",
+    "repo": "flowelement-xinliuyuansu/m_flow",
+    "func": "query_by_attributes",
+    "url": "https://github.com/FlowElement-xinliuyuansu/m_flow/blob/0d585cda2f588af69fb872ae6914caba0c217816/m_flow/adapters/graph/neo4j_driver/adapter.py#L747-L784",
+    "score": 0.9839543074320874,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-16f013cc9f62aabd",
+    "repo": "parcadei/continuous-claude-v3",
+    "func": "weekly_summary",
+    "url": "https://github.com/parcadei/Continuous-Claude-v3/blob/d07ff4b06b62f43771bc0c927d0211b734d6149e/opc/scripts/braintrust_analyze.py#L557-L620",
+    "score": 0.9837255797869318,
+    "class": "sqli"
+   },
+   {
+    "id": "corpus-a50e43e9517fc4d7",
+    "repo": "repowise-dev/repowise",
+    "func": "__init__",
+    "url": "https://github.com/repowise-dev/repowise/blob/c3591a7ffbd4a2df227f0be3ad19414b5e10a98a/packages/core/src/repowise/core/generation/editor_files/base.py#L34-L42",
+    "score": 0.9835855684314786,
+    "class": "codei"
+   }
+  ]
+ }
+}

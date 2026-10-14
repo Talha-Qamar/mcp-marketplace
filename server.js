@@ -7,6 +7,8 @@ const { initDb } = require('./src/db');
 const authRoutes = require('./src/routes/auth');
 const apiRoutes = require('./src/routes/api');
 const mcsRoutes = require('./src/routes/mcpsecure');
+const submissionRoutes = require('./src/routes/submissions');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,8 +16,13 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Set SESSION_SECRET in any shared deployment. Without it a random secret is
+// generated per process (sessions then end on restart), never a hard-coded one.
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) console.warn('[server] SESSION_SECRET not set: using a random per-process secret');
+
 app.use(session({
-    secret: 'mcp_marketplace_secret_key_123!@#',
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -32,6 +39,7 @@ app.use(express.static(publicPath));
 app.use('/api/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/mcs', mcsRoutes);
+app.use('/api/v1', submissionRoutes);
 
 // Serve specific HTML pages (existing + MCS additions)
 const pages = [
@@ -78,6 +86,11 @@ async function start() {
         await initDb();
         console.log('Database initialized successfully.');
 
+        // Start local analyzer services that are not already running (dev only;
+        // MCS_SPAWN_ANALYZERS=0 in deployments that run them separately).
+        const { ensureLocalAnalyzers } = require('./src/mcpsecure/orchestrator/local_services');
+        await ensureLocalAnalyzers();
+
         // Seed MCP Secure demo data (idempotent — safe to run every startup)
         try {
             const { seedMcpSecure } = require('./src/mcpsecure/seed');
@@ -85,6 +98,8 @@ async function start() {
         } catch (e) {
             console.warn('[MCS] Seed warning (non-fatal):', e.message);
         }
+
+        require('./src/mcpsecure/submissions').startWorker();
 
         app.listen(PORT, () => {
             console.log(`\n🚀 MCP Marketplace server running on http://localhost:${PORT}`);

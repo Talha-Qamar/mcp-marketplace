@@ -141,6 +141,8 @@ const MCSAPI = (() => {
     getAnchors: () => get('/anchors'),
     triggerAnchor: () => post('/anchors/trigger', {}),
     getWatcher: () => get('/watcher'),
+    pollWatcher: () => post('/watcher/poll', {}),
+    getConfig: () => get('/config'),
     simulateUpdate: (serverId, updateType) => post(`/watcher/${serverId}/simulate-update`, { updateType }),
     verifyExternal: (body) => post('/verify-external', body),
     getPubkey: () => get('/pubkey'),
@@ -183,13 +185,202 @@ function realBadge(tooltip = '') {
   return `<span class="mcs-real-badge" title="${tooltip}">REAL CRYPTO</span>`;
 }
 
+function realAnalysisBadge(tooltip = '') {
+  return `<span class="mcs-real-badge" title="${tooltip}">REAL ANALYSIS</span>`;
+}
+
+/**
+ * Badge for one analyzer card, driven by what the backend reports it ran.
+ * Never hardcode this — the whole point is that the label tracks reality.
+ */
+function analyzerBadge(a) {
+  if (a.status === 'unavailable' || a.status === 'error') {
+    return `<span class="mcs-sim-badge" style="background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.35)" title="${escapeHtml((a.evidence || [])[0] || '')}">${a.status === 'error' ? 'ERROR' : 'NOT RUNNING'}</span>`;
+  }
+  if (a.status === 'not_applicable') {
+    return `<span class="mcs-sim-badge" title="Nothing in this server this analyzer can read (e.g. no Python for the AST analyzer)">N/A</span>`;
+  }
+  if (a.engine === 'static') {
+    return realAnalysisBadge('Deterministic static analysis of the real source code. Parsed, never executed.');
+  }
+  if (a.engine === 'model') {
+    return realAnalysisBadge('Trained model served over the MCP Secure analyzer contract. Deterministic CPU inference.');
+  }
+  if (a.engine === 'agent') {
+    return realAnalysisBadge('Verification agent (advisory only — never changes the verdict).');
+  }
+  return simBadge(a.fallbackUsed
+    ? 'Built-in heuristic stand-in: the trained model for this slot is not configured yet.'
+    : 'Heuristic analyzer.');
+}
+
+function astEngineOf(analyzers) {
+  const ast = (analyzers || []).find(a => a.analyzer === 'ast_taint' || a.analyzer === 'AST_TAINT');
+  return ast ? ast.engine : undefined;
+}
+
+function setFastMode(value) {
+  FAST_MODE = !!value;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live pipeline — real backend stages over SSE.
+//
+// The stage list below is populated by events the server emits as each stage
+// ACTUALLY finishes, carrying its measured duration. Nothing here is on a
+// timer. (The detailed cards that render afterwards are a replay of results
+// that already exist by then, which is why their fake delays are switched off.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STAGE_LABELS = {
+  parse: 'Parse source & extract tool views',
+  ingest: 'Ingest: pin source, select files, discover tools',
+  ingest_checks: 'Declared vs discovered tools',
+  ast_taint: 'AST taint analyzer',
+  model_b: 'Model B — code classifier',
+  model_a: 'Model A — tool poisoning / preference manipulation',
+  model_c: 'Model C — verification agent (advisory)',
+  triage: 'Model C — verification agent (advisory)',
+  policy: 'Deterministic policy engine',
+  fingerprint: 'Fingerprint & commit pin',
+  attest: 'Ed25519 attestation',
+  log: 'Merkle transparency log',
+  anchor: 'Chain anchor',
+  blocked: 'Blockchain storage blocked',
+};
+
+function stageDetailText(e) {
+  const bits = [];
+  if (e.codeOrigin) {
+    bits.push(e.codeOrigin === 'tool_source'
+      ? `${e.sourcedTools}/${e.toolCount} tools from stored source`
+      : 'markdown fallback (no stored source)');
+  }
+  if (e.codeChars !== undefined) bits.push(`code ${e.codeChars}c · text ${e.textChars}c`);
+  if (e.files !== undefined) bits.push(`${e.files} file(s) · ${(e.languages || []).join('/') || 'no code'} · ${e.tools} tool(s) (${e.toolDiscovery})`);
+  if (e.commitSha) bits.push(`commit ${String(e.commitSha).slice(0, 12)}`);
+  if (e.error) bits.push(`error: ${e.error}`);
+  if (e.engine) bits.push(`engine: ${e.engine}`);
+  if (e.findings !== undefined) bits.push(`${e.findings} finding(s)`);
+  if (e.score !== undefined) bits.push(`score ${(e.score * 100).toFixed(0)}%`);
+  if (e.verdict && e.status === 'done') bits.push(`→ ${e.verdict}`);
+  if (e.contentFingerprint) bits.push(`fp ${String(e.contentFingerprint).slice(0, 16)}…`);
+  if (e.hashesGenerated === false) bits.push('hashes withheld');
+  if (e.attestationId) bits.push(String(e.attestationId).slice(0, 18) + '…');
+  if (e.logIndex !== undefined) bits.push(`leaf #${e.logIndex}`);
+  if (e.blockNumber !== undefined) bits.push(`block #${e.blockNumber}`);
+  if (e.attestationStatus) bits.push(e.attestationStatus);
+  if (e.reason) bits.push(e.reason);
+  return bits.join(' · ');
+}
+
+function createLiveStageView(container) {
+  const events = [];
+  container.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <h3 style="margin:0;font-size:1rem;">Live pipeline ${realBadge('Stages stream from the backend as they complete. Durations are measured, not scripted.')}</h3>
+        <span id="mcs-live-total" style="font-family:var(--font-mono);color:var(--text-3);font-size:0.8125rem;"></span>
+      </div>
+      <ul id="mcs-live-list" style="list-style:none;padding:0;margin:1rem 0 0;"></ul>
+    </div>`;
+
+  const list = container.querySelector('#mcs-live-list');
+  const totalEl = container.querySelector('#mcs-live-total');
+  const started = Date.now();
+  let measured = 0;
+
+  return {
+    events,
+    onStage(e) {
+      events.push(e);
+      const id = 'mcs-live-' + e.stage;
+      let row = document.getElementById(id);
+      if (!row) {
+        // Two rows, not one: a long detail string on the same flex line
+        // collapses the label to a single character per line.
+        row = document.createElement('li');
+        row.id = id;
+        row.style.cssText = 'padding:0.45rem 0;border-bottom:1px solid var(--border);font-size:0.875rem;';
+        row.innerHTML = `
+          <div style="display:flex;align-items:baseline;gap:0.75rem;">
+            <span class="live-icon" style="flex:0 0 1.25rem;color:var(--text-3);">⋯</span>
+            <span style="flex:1 1 auto;min-width:0;">${escapeHtml(STAGE_LABELS[e.stage] || e.stage)}</span>
+            <span class="live-ms" style="flex:0 0 auto;font-family:var(--font-mono);color:var(--text-3);min-width:4.5rem;text-align:right;"></span>
+          </div>
+          <div class="live-detail" style="margin-left:2rem;color:var(--text-3);font-family:var(--font-mono);font-size:0.7rem;line-height:1.5;overflow-wrap:anywhere;"></div>`;
+        list.appendChild(row);
+      }
+      if (e.status === 'done') {
+        row.querySelector('.live-icon').textContent = '✓';
+        row.querySelector('.live-icon').style.color = 'var(--success)';
+        row.querySelector('.live-detail').textContent = stageDetailText(e);
+        if (typeof e.ms === 'number') {
+          row.querySelector('.live-ms').textContent = `${e.ms} ms`;
+          measured += e.ms;
+        }
+      }
+      totalEl.textContent = `${Date.now() - started} ms elapsed · ${measured} ms in-stage`;
+    },
+    finish() {
+      totalEl.textContent = `${Date.now() - started} ms wall · ${measured} ms measured in-stage`;
+    },
+  };
+}
+
+/**
+ * Run a scan with live stage streaming.
+ * Falls back to the plain POST endpoint when EventSource is unavailable.
+ */
+function streamScan(slug, options = {}) {
+  const { baitAndSwitch = false, onStage, onBegin } = options;
+
+  return new Promise((resolve, reject) => {
+    if (typeof EventSource === 'undefined') {
+      fetch('/api/mcs/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverSlug: slug, baitAndSwitch }),
+      }).then(r => r.json().then(j => (r.ok ? resolve(j) : reject(new Error(j.error || r.statusText)))))
+        .catch(reject);
+      return;
+    }
+
+    const params = new URLSearchParams({ serverSlug: slug });
+    if (baitAndSwitch) params.set('baitAndSwitch', 'true');
+    const es = new EventSource('/api/mcs/scan/stream?' + params.toString());
+    let settled = false;
+
+    const fail = (message) => {
+      if (settled) return;
+      settled = true;
+      es.close();
+      reject(new Error(message));
+    };
+
+    es.addEventListener('begin', ev => { if (onBegin) onBegin(JSON.parse(ev.data)); });
+    es.addEventListener('stage', ev => { if (onStage) onStage(JSON.parse(ev.data)); });
+    es.addEventListener('result', ev => {
+      settled = true;
+      es.close();
+      resolve(JSON.parse(ev.data));
+    });
+    es.addEventListener('error', ev => {
+      let message = 'Scan stream failed';
+      try { if (ev.data) message = JSON.parse(ev.data).error || message; } catch (_) { /* native error */ }
+      fail(message);
+    });
+    es.onerror = () => fail('Connection to scan stream lost');
+  });
+}
+
 /**
  * Render the animated pipeline view into a container element.
  * @param {HTMLElement} container
  * @param {object} scanResult - from /api/mcs/scan
  * @param {Function} onComplete - called after all stages animate
  */
-async function renderPipelineAnimation(container, scanResult, onComplete) {
+async function renderPipelineAnimation(container, scanResult, onComplete, liveFacts = null) {
   const { scanRecord, attestation } = scanResult;
   const { snapshot, analyzers, verdict, policyVersion, rulesetHash } = scanRecord;
 
@@ -210,7 +401,9 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
       <div class="mcs-stage mcs-stage-pending" id="stage-parse">
         <div class="mcs-stage-icon">📄</div>
         <div class="mcs-stage-body">
-          <div class="mcs-stage-title">Step 1: Parse AST &amp; Extract Tools ${simBadge('AST parser & tool interface extraction')}</div>
+          <div class="mcs-stage-title">Step 1: Ingest source &amp; discover tools ${scanRecord.ingest
+            ? realAnalysisBadge('Real ingestion: pinned source, shared file filter, static tool discovery (Python ast / TypeScript compiler). Nothing is executed.')
+            : simBadge('Legacy scan record (before the ingestion pipeline)')}</div>
           <div class="mcs-stage-content" id="parse-content"></div>
         </div>
         <div class="mcs-stage-spinner" id="parse-spinner"></div>
@@ -325,13 +518,22 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
   // ── 1. Animate: Parse AST ────────────────────────────────────────────────
   stageStart('stage-parse');
   await stageDelay(STAGE_DELAY);
-  document.getElementById('parse-content').innerHTML = `
+  // Real measurements from the backend's parse stage when we have them.
+  // This used to invent both numbers (one of them with Math.random), which
+  // made the panel non-deterministic and simply untrue.
+  const ing = scanRecord.ingest;
+  const subj = scanRecord.subject || {};
+  document.getElementById('parse-content').innerHTML = ing ? `
     <div style="color:var(--text-2);font-size:0.875rem;">
-      Extracted code AST (long_description + tool functions) and natural language text (metadata + descriptions).
-      <br>Code view length: <strong style="color:var(--text-1)">${(scanRecord.snapshot.repoRef || '').length + 220} chars</strong> |
-      Text view length: <strong style="color:var(--text-1)">${Math.floor(Math.random() * 150) + 380} chars</strong>
-    </div>
-  `;
+      Source <strong style="color:var(--text-1)">${escapeHtml(subj.source_kind || '')}</strong>
+      ${subj.repo_url ? `· ${escapeHtml(subj.repo_url)}${subj.subdir ? '/' + escapeHtml(subj.subdir) : ''}` : ''}
+      ${subj.commit_sha ? `· commit <code class="mcs-hash-short">${subj.commit_sha.slice(0, 12)}</code>` : '· not a git commit (local/upload)'}
+      <br><strong style="color:var(--text-1)">${ing.files.length}</strong> code file(s) ·
+      <strong style="color:var(--text-1)">${ing.tools.length}</strong> MCP tool(s) found (discovery: ${escapeHtml(ing.tool_discovery)})
+      <br>Content fingerprint (code + tools + listing): <code class="mcs-hash-short">${escapeHtml(String(subj.content_fingerprint || '').slice(0, 30))}…</code>
+      ${ing.tools.length ? `<ul style="margin:0.5rem 0 0 1rem;font-size:0.8rem;">${ing.tools.map(t => `<li><code>${escapeHtml(t.name)}</code> — ${escapeHtml(t.file)}:${t.handler.start_line} <span style="color:var(--text-3)">(${escapeHtml(t.discovered_by)})</span></li>`).join('')}</ul>` : ''}
+      ${(ing.notes || []).length ? `<div style="margin-top:0.4rem;color:var(--warning);font-size:0.78rem;">${ing.notes.map(escapeHtml).join('<br>')}</div>` : ''}
+    </div>` : '<div style="color:var(--text-2);font-size:0.875rem;">Legacy scan record: no ingestion data.</div>';
   stageDone('stage-parse');
 
   // ── 2. Animate: Detection Analyzers (parallel models) ─────────────────────
@@ -345,12 +547,12 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
 
   const grid = document.getElementById('analyzers-grid');
   grid.innerHTML = analyzers.map(a => {
-    const info = analyzerNames[a.analyzer] || {};
+    const info = analyzerNames[a.analyzer] || { label: a.display_name, sublabel: a.sublabel, color: '#06b6d4' };
     return `
     <div class="mcs-analyzer-card" id="ac-${a.analyzer}">
       <div class="mcs-analyzer-header">
         <span class="mcs-analyzer-name" style="color:${info.color}">${info.label || a.analyzer}</span>
-        ${simBadge(`In production: fine-tuned ML model. Here: deterministic heuristics.`)}
+        ${analyzerBadge(a)}
         <span class="mcs-analyzer-sub">${info.sublabel || ''}</span>
       </div>
       <div class="mcs-analyzer-body">
@@ -367,7 +569,10 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
     if (!card) continue;
 
     const threatColor = a.score >= 0.75 ? 'var(--error)' : a.score >= 0.40 ? 'var(--warning)' : 'var(--success)';
-    const hasIssues = a.evidence.some(e => !e.startsWith('No '));
+    // Driven by the analyzer's own score/threat, not by string-matching the
+    // evidence: evidence lines now include an "engine:" header, and a clean
+    // scan must not be labelled "Flags Found" just because that line exists.
+    const hasIssues = a.score > 0 || (a.threat && a.threat !== 'none');
 
     card.querySelector('.mcs-analyzer-body').innerHTML = `
       <div class="mcs-score-row">
@@ -395,8 +600,11 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
   stageStart('stage-policy');
   await stageDelay(STAGE_DELAY);
 
-  const maxScore = Math.max(...analyzers.map(a => a.score));
-  const astFired = analyzers.find(a => a.analyzer === 'AST_TAINT')?.score >= 0.6;
+  const pol = scanRecord.policy;
+  const maxScore = pol ? pol.max_effective_score : Math.max(0, ...analyzers.map(a => a.score));
+  const reasonRows = pol && pol.reasons.length
+    ? pol.reasons.map(r => `<li><code>${escapeHtml(r.rule)}</code>${r.verdict ? ` → <strong>${r.verdict}</strong>` : ''}: ${escapeHtml(r.message)}</li>`).join('')
+    : '<li>No rule fired: every analyzer ran, coverage is sufficient and no finding reached the review threshold.</li>';
 
   document.getElementById('policy-content').innerHTML = `
     <div class="mcs-kv-grid">
@@ -404,12 +612,11 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
       <span class="mcs-kv-val">${policyVersion}</span>
       <span class="mcs-kv-key">Ruleset Hash</span>
       <code class="mcs-hash mcs-hash-short">${rulesetHash}</code>
-      <span class="mcs-kv-key">Max Analyzer Threat Score</span>
+      <span class="mcs-kv-key">Highest Effective Score</span>
       <span class="mcs-kv-val">${(maxScore * 100).toFixed(0)}%</span>
-      <span class="mcs-kv-key">AST Hard-Fail Triggered</span>
-      <span class="mcs-kv-val" style="color:${astFired ? 'var(--error)' : 'var(--success)'}">${astFired ? 'YES → Hard Rejection' : 'No'}</span>
-      <span class="mcs-kv-key">Policy Gate Rule</span>
-      <span class="mcs-kv-val">Only PASS clears to hash generation &amp; blockchain storage</span>
+    </div>
+    <div style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-2);">Rules that fired:
+      <ul style="margin:0.35rem 0 0 1.1rem;padding:0;line-height:1.6;">${reasonRows}</ul>
     </div>
   `;
   stageDone('stage-policy');
@@ -433,24 +640,17 @@ async function renderPipelineAnimation(container, scanResult, onComplete) {
     stageStart('stage-modelc');
     await stageDelay(STAGE_DELAY * 1.2);
 
-    const flaggedEvidence = analyzers.flatMap(a => a.evidence).filter(e => !e.startsWith('No '));
-    const rationale = flaggedEvidence.length > 0
-      ? `Reviewing flagged signals: "${flaggedEvidence[0]}". Potential deceptive or manipulative pattern.`
-      : 'Reviewing analyzer outputs. Awaiting human verification.';
-
+    const tri = scanRecord.triage;
+    const rec = tri && tri.recommendation;
     document.getElementById('modelc-content').innerHTML = `
       <div class="mcs-modelc-panel">
         <div class="mcs-modelc-icon">🤖</div>
         <div>
-          <strong>Model C Security Reasoning:</strong>
-          <p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">${escapeHtml(rationale)}</p>
-          <p style="margin:0;color:var(--text-2);font-size:0.875rem;">
-            Recommendation: <strong style="color:var(--warning)">Escalate to human reviewer.</strong>
-            Blockchain storage remains locked until manual sign-off.
-          </p>
-          <div class="mcs-modelc-note">
-            Blockchain protection: Hashes are withheld until approved by a reviewer.
-          </div>
+          <strong>Model C — verification agent (advisory):</strong>
+          ${rec ? `
+          <p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">Recommendation: <strong>${escapeHtml(rec.decision)}</strong> — ${escapeHtml(rec.rationale)}</p>`
+          : `<p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">${tri ? `Model C ${escapeHtml(tri.status)}${tri.error ? ': ' + escapeHtml(tri.error) : ''}.` : 'Model C is not configured yet.'} The submission goes to the admin review queue.</p>`}
+          <div class="mcs-modelc-note">Model C never changes the verdict: an admin approves or rejects every REVIEW.</div>
         </div>
       </div>
     `;
@@ -936,6 +1136,7 @@ const MCSWatcher = (() => {
 
   async function render(container) {
     const rows = await MCSAPI.getWatcher().catch(() => []);
+    const demoMode = (await MCSAPI.getConfig().catch(() => ({ demoMode: false }))).demoMode;
 
     const statusBadge = (s) => {
       const map = {
@@ -958,7 +1159,7 @@ const MCSWatcher = (() => {
           <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-2);font-size:0.875rem;">
             <input type="checkbox" id="autopoll-toggle"> Auto-poll (30s)
           </label>
-          <button class="btn btn-outline btn-sm" onclick="MCSWatcher.pollNow()">⟳ Poll Now</button>
+          <button class="btn btn-outline btn-sm" onclick="MCSWatcher.pollNow(this)" title="git ls-remote on every watched repository; a new commit is re-scanned through the gate">⟳ Poll Now</button>
         </div>
       </div>
 
@@ -987,7 +1188,7 @@ const MCSWatcher = (() => {
                 <td>${statusBadge(row.status)}</td>
                 <td style="font-size:0.8rem;color:var(--text-3)">${row.lastCheckedAt ? new Date(row.lastCheckedAt).toLocaleString() : '—'}</td>
                 <td>
-                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;${demoMode ? '' : 'display:none;'}">
                     <button class="btn btn-outline btn-xs" onclick="MCSWatcher.simulateUpdate('${row.serverId}', 'docs_only')" title="Only README changed — fingerprint unchanged, verdict carried forward">📄 Docs Only</button>
                     <button class="btn btn-xs" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;" onclick="MCSWatcher.simulateUpdate('${row.serverId}', 'bait_and_switch')" title="Malicious code injected — triggers automatic re-scan">☠ Bait &amp; Switch</button>
                   </div>
@@ -1090,11 +1291,24 @@ const MCSWatcher = (() => {
     `;
   }
 
-  async function pollNow() {
-    const btn = event?.target;
+  // Real poll: the server runs git ls-remote on each watched git repository
+  // and queues a gate re-scan for every new commit.
+  async function pollNow(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Polling…'; }
+    let summary = '';
+    try {
+      const { polled } = await MCSAPI.pollWatcher();
+      const label = { new_commit: 'new commit → re-scan queued', up_to_date: 'up to date', scan_pending: 'scan in progress', error: 'error' };
+      summary = polled.length === 0
+        ? '<p style="margin:0">No git-sourced servers are being watched yet. Publish one (e.g. a testbed branch) first.</p>'
+        : `<ul style="margin:0;padding-left:1.2rem">${polled.map(p => `<li><strong>${escapeHtml(p.name)}</strong>: ${escapeHtml(label[p.status] || p.status)}${p.sha ? ` <code>${escapeHtml(p.sha.slice(0, 12))}</code>` : ''}${p.error ? ` (${escapeHtml(p.error)})` : ''}${p.submissionId ? ` · <a href="/server-detail?slug=${encodeURIComponent(p.slug)}">listing</a> (press Poll Now again when the scan has finished)` : ''}</li>`).join('')}</ul>`;
+    } catch (e) {
+      summary = `<p style="margin:0;color:var(--error)">Poll failed: ${escapeHtml(e.message)}</p>`;
+    }
     await render(document.querySelector('.mcs-watcher-root') || document.querySelector('main'));
-    if (btn) { btn.disabled = false; btn.textContent = '⟳ Poll Now'; }
+    const el = document.getElementById('watcher-update-result');
+    if (el) el.innerHTML = `<div class="card mcs-update-result-card"><h3 style="margin-top:0">Poll result · ${new Date().toLocaleTimeString()}</h3>${summary}</div>`;
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = '⟳ Poll Now'; }
   }
 
   return { render, simulateUpdate, loadVersionHistory, pollNow };
@@ -1156,13 +1370,13 @@ const MCSVerifier = (() => {
         </div>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Candidate Server Ref (repo URL)</label>
-          <input class="input" id="vf-candidate-ref" value="https://github.com/acme-corp/crm-mcp-connector" placeholder="https://github.com/org/repo">
+          <input class="input" id="vf-candidate-ref" value="https://github.com/modelcontextprotocol/servers/tree/main/src/fetch" placeholder="https://github.com/org/repo">
         </div>
         <div style="margin-bottom:1.5rem;">
           <span style="color:var(--text-3);font-size:0.8125rem;">Or use a seeded external candidate:</span>
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;">
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/acme-corp/crm-mcp-connector';document.getElementById('vf-requester').value='Acme MCP Market'">Acme CRM Connector</button>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/badseller/malware-mcp';document.getElementById('vf-requester').value='Beta Marketplace'">Malware MCP (for demo)</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/modelcontextprotocol/servers/tree/main/src/fetch';document.getElementById('vf-requester').value='Acme MCP Market'">Official fetch server</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='demo:shell-runner';document.getElementById('vf-requester').value='Beta Marketplace'">Shell Runner (bundled demo)</button>
           </div>
         </div>
         <button class="btn btn-primary" onclick="MCSVerifier.runExternal()">
@@ -1196,7 +1410,7 @@ const MCSVerifier = (() => {
         <p style="color:var(--text-2);font-size:0.875rem;">This shows what the MCP tool call looks like when an external client calls MCP Secure's own MCP server.</p>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Candidate Ref</label>
-          <input class="input" id="vf-ep-ref" value="https://github.com/acme-corp/crm-mcp-connector">
+          <input class="input" id="vf-ep-ref" value="https://github.com/modelcontextprotocol/servers/tree/main/src/fetch">
         </div>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Requester</label>
@@ -1370,6 +1584,7 @@ const MCSViews = (() => {
         <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;font-size:0.75rem;">
           <span class="mcs-sim-badge">SIMULATED (POC)</span> = deterministic mock of future ML/chain component
           <span class="mcs-real-badge">REAL CRYPTO</span> = genuine SHA-256, Ed25519, Merkle proof
+          <span class="mcs-real-badge">REAL ANALYSIS</span> = genuine Python AST taint analysis (never executed)
         </div>
       </div>
     `;
@@ -1410,9 +1625,14 @@ window.MCSVerify = MCSVerify;
 window.MCSWatcher = MCSWatcher;
 window.MCSVerifier = MCSVerifier;
 window.renderPipelineAnimation = renderPipelineAnimation;
+window.createLiveStageView = createLiveStageView;
+window.streamScan = streamScan;
+window.setFastMode = setFastMode;
 window.verdictBadge = verdictBadge;
 window.simBadge = simBadge;
 window.realBadge = realBadge;
+window.realAnalysisBadge = realAnalysisBadge;
+window.analyzerBadge = analyzerBadge;
 window.escapeHtml = escapeHtml;
 window.stageDelay = stageDelay;
 window.FAST_MODE = FAST_MODE;

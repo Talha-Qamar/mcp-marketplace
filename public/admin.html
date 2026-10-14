@@ -91,10 +91,10 @@
     <script src="/js/app.js"></script>
     <script>
     'use strict';
-    function requireLogin() {
-        const t = localStorage.getItem('token');
-        if (!t) window.location.href = '/login.html?next=/admin.html';
-        return t;
+    // Auth is the session cookie (express-session); nothing stores a token.
+    async function requireLogin() {
+        const r = await fetch('/api/auth/me').catch(() => null);
+        if (!r || !r.ok) window.location.href = '/login.html?next=/admin.html';
     }
     function switchTab(id, btn) {
         document.querySelectorAll('.admin-nav-item').forEach(b => b.classList.remove('active'));
@@ -150,45 +150,65 @@
             el.innerHTML = `<div class="card" style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`;
         }
     }
+    // Review queue: submissions whose verdict was REVIEW. Admin only; every
+    // decision needs a note and is stored (GET /api/v1/submissions/:id shows it).
     async function loadReview() {
         const el = document.getElementById('review-queue-list');
         try {
-            const scans = await MCSAPI.getAllScans(200);
-            const queue = (scans||[]).filter(s =>
-                s.verdict === 'REVIEW' && !s.superseded &&
-                !s.serverId.startsWith('preview:') && !s.serverId.startsWith('external:'));
-            if (queue.length === 0) {
+            const resp = await fetch('/api/v1/review-queue');
+            if (resp.status === 401 || resp.status === 403) {
+                el.innerHTML = `<div class="empty-state">The review queue is for admins only (seeded admin: <code>dave_sec@example.com</code>).</div>`;
+                return;
+            }
+            const queue = await resp.json();
+            if (!Array.isArray(queue) || queue.length === 0) {
                 el.innerHTML = `<div class="empty-state" style="border-color:rgba(52,211,153,0.2);">
                     ✓ Review queue is empty — no servers pending a decision.</div>`; return;
             }
-            el.innerHTML = queue.map(s => `<div class="review-card">
-                <div>
-                  <div style="font-weight:600;margin-bottom:0.2rem;">${escapeHtml(s.snapshot?.name||s.serverId)}</div>
-                  <div class="review-card-meta">Score: ${((s.policyResult?.finalScore??0)*100).toFixed(0)}% · v${s.version} · ${new Date(s.createdAt).toLocaleString()}</div>
-                  <div style="margin-top:0.4rem;font-size:0.78rem;color:var(--text-3);">${(s.policyResult?.reasons||[]).join(' · ')}</div>
+            el.innerHTML = queue.map(q => {
+                const pol = (q.scan && q.scan.policy) || { reasons: [], max_effective_score: 0 };
+                const flagged = ((q.scan && q.scan.analyzers) || []).flatMap(a =>
+                    a.evidence.slice(1).filter(e => !/^(No findings|note:|not applicable)/.test(e)).map(e => `${a.display_name}: ${e}`));
+                return `<div class="review-card" data-id="${q.id}">
+                <div style="flex:1 1 auto;min-width:0;">
+                  <div style="font-weight:600;margin-bottom:0.2rem;">${escapeHtml(q.name)} <span style="color:var(--text-3);font-weight:400;">· ${escapeHtml(q.slug)} · by ${escapeHtml(q.submitter)}</span></div>
+                  <div class="review-card-meta">Highest effective score: ${(pol.max_effective_score * 100).toFixed(0)}% · scan v${q.scan ? q.scan.version : '?'} · ${new Date(q.updatedAt).toLocaleString()}
+                    ${q.scan && q.scan.subject && q.scan.subject.commit_sha ? ` · commit <code>${q.scan.subject.commit_sha.slice(0, 12)}</code>` : ''}</div>
+                  <ul style="margin:0.4rem 0 0 1rem;font-size:0.78rem;color:var(--text-2);">${pol.reasons.map(r => `<li><code>${escapeHtml(r.rule)}</code>: ${escapeHtml(r.message)}</li>`).join('')}</ul>
+                  ${flagged.length ? `<details style="margin-top:0.3rem;font-size:0.75rem;color:var(--text-3);"><summary>${flagged.length} finding(s)</summary><ul style="margin:0.3rem 0 0 1rem;">${flagged.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul></details>` : ''}
+                  <div style="margin-top:0.3rem;font-size:0.75rem;color:var(--text-3);">Model C: ${q.scan && q.scan.triage && q.scan.triage.recommendation ? escapeHtml(q.scan.triage.recommendation.decision + ' — ' + q.scan.triage.recommendation.rationale) : 'not configured (advisory only)'}</div>
+                  <input class="input review-note" placeholder="Decision note (required)" style="margin-top:0.5rem;font-size:0.8rem;">
                 </div>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
                   ${verdictBadge('REVIEW')}
-                  <a href="/attestations?id=${s.id}" class="btn btn-outline btn-sm">Attestation</a>
+                  <a href="/attestations?id=${encodeURIComponent(q.scanRecordId || '')}" class="btn btn-outline btn-sm">Scan record</a>
                   <button class="btn btn-sm" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:#34d399;"
-                    onclick="approveRow(this)">✓ Approve</button>
+                    onclick="decideRow(this, 'approve')">✓ Approve</button>
                   <button class="btn btn-sm" style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:#f87171;"
-                    onclick="rejectRow(this)">✕ Reject</button>
+                    onclick="decideRow(this, 'reject')">✕ Reject</button>
                 </div>
-            </div>`).join('');
+            </div>`; }).join('');
         } catch(e) { el.innerHTML = `<div style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
     }
-    function approveRow(btn) {
+    async function decideRow(btn, decision) {
         const card = btn.closest('.review-card');
-        card.style.opacity = '0.5';
-        card.insertAdjacentHTML('beforeend','<div style="width:100%;font-size:0.8rem;color:#34d399;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(52,211,153,0.15);">✓ Approved — server will appear in the marketplace.</div>');
-        btn.disabled = true; btn.nextElementSibling.disabled = true;
-    }
-    function rejectRow(btn) {
-        const card = btn.closest('.review-card');
-        card.style.opacity = '0.5';
-        card.insertAdjacentHTML('beforeend','<div style="width:100%;font-size:0.8rem;color:#f87171;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(248,113,113,0.15);">✕ Rejected — server will not be listed.</div>');
-        btn.disabled = true; btn.previousElementSibling.disabled = true;
+        const note = card.querySelector('.review-note').value.trim();
+        if (!note) { card.querySelector('.review-note').focus(); alert('Add a note explaining the decision.'); return; }
+        card.querySelectorAll('button').forEach(b => b.disabled = true);
+        try {
+            const resp = await fetch(`/api/v1/submissions/${card.dataset.id}/decision`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision, note }),
+            });
+            const body = await resp.json();
+            if (!resp.ok) throw new Error(body.error || resp.statusText);
+            const ok = decision === 'approve';
+            card.style.opacity = '0.5';
+            card.insertAdjacentHTML('beforeend', `<div style="width:100%;font-size:0.8rem;color:${ok ? '#34d399' : '#f87171'};margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);">${ok ? '✓ Approved — the server is now listed.' : '✕ Rejected — the server will not be listed.'} (saved)</div>`);
+        } catch (e) {
+            card.querySelectorAll('button').forEach(b => b.disabled = false);
+            alert('Decision failed: ' + e.message);
+        }
     }
     async function loadWatcher() {
         await MCSWatcher.render(document.getElementById('watcher-root'));
@@ -247,19 +267,18 @@
         } catch(e) { el.innerHTML = `<div style="color:var(--error);">Error: ${escapeHtml(e.message)}</div>`; }
     }
     document.addEventListener('DOMContentLoaded', async () => {
-        requireLogin();
+        await requireLogin();
         try {
-            const token = localStorage.getItem('token');
-            const me = await fetch('/api/me', { headers:{ Authorization:'Bearer '+token } }).then(r=>r.json());
+            const me = await fetch('/api/auth/me').then(r => r.json());
+            const u = me.user || {};
             document.getElementById('admin-meta').innerHTML =
-                `Logged in as <strong>${escapeHtml(me.username||me.email||'user')}</strong>`;
+                `Logged in as <strong>${escapeHtml(u.username || u.email || 'user')}</strong> · role <strong>${escapeHtml(u.role || 'publisher')}</strong>`;
         } catch(_) {}
         await loadStats();
         await loadMyServers();
     });
     window.switchTab   = switchTab;
-    window.approveRow  = approveRow;
-    window.rejectRow   = rejectRow;
+    window.decideRow   = decideRow;
     </script>
 </body>
 </html>

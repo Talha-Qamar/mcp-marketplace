@@ -1,0 +1,9 @@
+{
+ "expect": "NOT_PASS",
+ "group": "hiding",
+ "pad": {
+  "file": "server.py",
+  "marker": "# __PAD__",
+  "bytes": 420000
+ }
+}

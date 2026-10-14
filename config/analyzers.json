@@ -1,0 +1,11 @@
+{
+  "description": "Analyzer registry (spec §5). Operational settings only: what an analyzer IS comes from its /v1/health and is recorded per scan. ${VAR:-default} reads the environment. An empty url with a fallback runs the built-in fallback instead; an empty url without one marks the slot unavailable.",
+  "analyzers": [
+    { "id": "ingest_checks", "builtin": "ingest_checks", "stage": "analyze", "required": false, "kind": "metadata" },
+    { "id": "ts_taint", "builtin": "ts_taint", "stage": "analyze", "required": false, "kind": "code" },
+    { "id": "ast_taint", "url": "${AST_TAINT_URL:-http://127.0.0.1:8701}", "stage": "analyze", "required": true, "kind": "code", "timeout_ms": 60000 },
+    { "id": "model_b", "url": "${MODEL_B_URL:-http://127.0.0.1:8765}", "stage": "analyze", "required": true, "kind": "code", "timeout_ms": 600000 },
+    { "id": "model_a", "url": "${MODEL_A_URL:-}", "fallback": "text_heuristic", "stage": "analyze", "required": true, "kind": "text", "timeout_ms": 120000 },
+    { "id": "model_c", "url": "${MODEL_C_URL:-}", "stage": "triage", "required": false, "kind": "triage", "when": "REVIEW", "timeout_ms": 300000 }
+  ]
+}

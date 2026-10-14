@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcp-secure.dev/contracts/analyzer-result.schema.json",
+  "title": "AnalyzerResult",
+  "description": "POST /v1/analyze response (spec §6.2). Findings must be sorted by (file, line, threat, finding_id).",
+  "type": "object",
+  "required": ["analyzer", "status", "coverage", "findings"],
+  "properties": {
+    "analyzer": {
+      "type": "object",
+      "required": ["id", "version", "artifact_hash", "engine"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "artifact_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "engine": { "enum": ["model", "static", "heuristic", "agent"] }
+      }
+    },
+    "status": { "enum": ["ok", "partial", "not_applicable", "error"] },
+    "error": { "type": "string" },
+    "coverage": {
+      "type": "object",
+      "required": ["units_total", "units_analyzed", "languages", "notes"],
+      "properties": {
+        "units_total": { "type": "integer", "minimum": 0 },
+        "units_analyzed": { "type": "integer", "minimum": 0 },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "recommendation": {
+      "description": "Triage analyzers only (Model C). Advisory; never changes the verdict.",
+      "type": "object",
+      "required": ["decision", "rationale"],
+      "properties": {
+        "decision": { "enum": ["approve", "reject", "uncertain"] },
+        "rationale": { "type": "string" },
+        "cited_finding_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["finding_id", "threat", "score", "severity", "location", "summary"],
+      "properties": {
+        "finding_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "threat": { "type": "string" },
+        "cwe": { "type": ["string", "null"] },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "location": {
+          "type": "object",
+          "required": ["file", "line", "function", "tool_id"],
+          "properties": {
+            "file": { "type": ["string", "null"] },
+            "line": { "type": ["integer", "null"] },
+            "function": {
+              "type": ["object", "null"],
+              "required": ["name", "start_line", "end_line"],
+              "properties": {
+                "name": { "type": "string" },
+                "start_line": { "type": "integer" },
+                "end_line": { "type": "integer" }
+              }
+            },
+            "tool_id": { "type": ["string", "null"] }
+          }
+        },
+        "summary": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

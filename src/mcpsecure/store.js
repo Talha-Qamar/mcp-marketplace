@@ -1,7 +1,7 @@
 /**
  * MCP Secure — Database Store
  * ============================
- * Thin wrapper over the existing sql.js db layer.
+ * Thin wrapper over the marketplace db layer (src/db.js).
  * All MCS tables are prefixed with mcs_ to avoid conflicts.
  *
  * Persistence: data survives server restarts via database/marketplace.db
@@ -18,8 +18,8 @@ function saveScanRecord(scanRecord, attestation) {
 
   runSql(`
     INSERT OR REPLACE INTO mcs_scan_records
-      (id, server_id, version, snapshot_json, analyzers_json, verdict, policy_version, ruleset_hash, model_hashes_json, attestation_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, server_id, version, snapshot_json, analyzers_json, verdict, policy_version, ruleset_hash, model_hashes_json, attestation_json, record_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     scanRecord.snapshot.serverId,
@@ -31,6 +31,7 @@ function saveScanRecord(scanRecord, attestation) {
     scanRecord.rulesetHash,
     JSON.stringify(scanRecord.modelVersionHashes),
     JSON.stringify(attestation),
+    JSON.stringify(scanRecord),
     attestation.createdAt || now,
   ]);
 
@@ -73,7 +74,15 @@ function markScanSuperseded(id) {
 }
 
 function parseScanRow(row) {
+  // record_json holds the full ScanRecord (contract results, policy reasons,
+  // ingestion summary). Rows written before it existed have none of those.
+  const record = row.record_json ? JSON.parse(row.record_json) : {};
   return {
+    subject: record.subject || null,
+    ingest: record.ingest || null,
+    results: record.results || [],
+    policy: record.policy || null,
+    triage: record.triage || null,
     id: row.id,
     serverId: row.server_id,
     version: row.version,

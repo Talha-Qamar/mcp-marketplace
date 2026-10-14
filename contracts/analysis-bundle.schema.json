@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcp-secure.dev/contracts/analysis-bundle.schema.json",
+  "title": "AnalysisBundle",
+  "description": "Everything an analyzer may read about one MCP server at one version. Produced by ingestion (spec \u00a74.5).",
+  "type": "object",
+  "required": [
+    "bundle_version",
+    "content_fingerprint",
+    "server",
+    "source",
+    "files",
+    "metadata_files",
+    "tools",
+    "declared_tools",
+    "coverage"
+  ],
+  "properties": {
+    "bundle_version": {
+      "const": "1"
+    },
+    "content_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "server": {
+      "type": "object",
+      "required": [
+        "name",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "declared_language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "git",
+            "upload",
+            "local"
+          ]
+        },
+        "repo_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "archive_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "language",
+          "sha256",
+          "size",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "python",
+              "typescript",
+              "javascript"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metadata_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "tool_id",
+          "name",
+          "description",
+          "description_resolved",
+          "input_schema",
+          "language",
+          "file",
+          "handler",
+          "discovered_by"
+        ],
+        "properties": {
+          "tool_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "description_resolved": {
+            "type": "boolean"
+          },
+          "input_schema": {
+            "type": "object"
+          },
+          "language": {
+            "enum": [
+              "python",
+              "typescript",
+              "javascript"
+            ]
+          },
+          "file": {
+            "type": "string"
+          },
+          "handler": {
+            "type": "object",
+            "required": [
+              "name",
+              "start_line",
+              "end_line"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "discovered_by": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "declared_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "tool_discovery",
+        "notes"
+      ],
+      "properties": {
+        "tool_discovery": {
+          "enum": [
+            "full",
+            "partial",
+            "none"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skipped_code": {
+          "description": "Code files not analysed because of size/count limits. The policy refuses PASS when any exist.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unresolved_descriptions": {
+          "description": "tool_ids whose description is built at runtime and could not be read statically.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

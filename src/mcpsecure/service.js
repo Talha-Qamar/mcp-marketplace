@@ -40,10 +40,27 @@ function simulateAnchor() {
   const leafData = leaves.map(l => l.attestationId);
   const { root } = mcsCrypto.buildMerkleTree(leafData);
 
-  // Simulated chain: monotonically increasing block number
+  // Simulated chain: monotonically increasing block number.
+  //
+  // Every value below is DERIVED, never random. The previous implementation
+  // used Math.random() for the block advance and Date.now() inside the tx
+  // hash, which made the anchor receipt the one artifact in the system that
+  // could not be reproduced from its inputs. Determinism is the project's
+  // headline property, so the mock has to honour it too — otherwise the
+  // honest answer to "is all of it deterministic?" is "no, except the bit we
+  // forgot about".
+  //
+  // Production note: a real Sepolia transaction is NOT deterministic in this
+  // way — block number and tx hash come from the network, and re-anchoring
+  // the same root would yield a different hash. What carries over is the
+  // receipt SHAPE and the fact that only the Merkle root is ever published.
   const lastBlock = store.getLatestBlockNumber();
-  const blockNumber = lastBlock + Math.floor(Math.random() * 12) + 1;
-  const txHash = '0x' + mcsCrypto.sha256hex(`anchor:${root}:${blockNumber}:${Date.now()}`).slice(0, 64);
+  const advance = (parseInt(root.slice(0, 8), 16) % 12) + 1; // 1..12, from the root
+  const blockNumber = lastBlock + advance;
+  const txHash = '0x' + mcsCrypto.sha256hex(`anchor:${root}:${blockNumber}`).slice(0, 64);
+
+  // Wall-clock, deliberately: this mirrors a real block timestamp, which is an
+  // observation rather than a derivation. It is not hashed into anything.
   const blockTimestamp = new Date().toISOString();
 
   const receipt = {
@@ -59,47 +76,74 @@ function simulateAnchor() {
   return receipt;
 }
 
+// ─── Watcher row: the commit last scanned, whatever the verdict ───────────────
+// (Recording only PASS scans made the watcher re-queue a rejected commit on
+// every poll.)
+const WATCH_STATUS = { PASS: 'up_to_date', REVIEW: 'change_detected', FAIL: 'no_longer_verifiable' };
+
+function recordWatcher(request, scanRecord) {
+  store.upsertWatcherRow({
+    serverId: request.serverId,
+    watchedRef: scanRecord.subject.ref || 'main',
+    lastSeenSha: scanRecord.subject.commit_sha,
+    lastFingerprint: scanRecord.subject.content_fingerprint,
+    lastVerdict: scanRecord.verdict,
+    lastCheckedAt: new Date().toISOString(),
+    status: WATCH_STATUS[scanRecord.verdict] || 'change_detected',
+  });
+}
+
 // ─── Full pipeline: scan → attest → log → maybe anchor ───────────────────────
 
 /**
  * Run the complete scan pipeline for a server.
- * @param {object} serverContent - { serverId, name, description, long_description, github_url, tools }
+ * @param {object} request - { serverId, source, listing, declaredTools } (see engine.runScan)
  * @param {number} [version]
  * @param {boolean} [isExternal=false]
+ * @param {function} [onStage] - live progress callback
  * @returns {{ scanRecord, attestation, logIndex, anchored }}
  */
-async function runFullPipeline(serverContent, version, isExternal = false) {
+async function runFullPipeline(request, version, isExternal = false, onStage = null) {
+  const stage = async (name, status, detail) => {
+    // Reserved keys go LAST so a detail field can never clobber them.
+    if (onStage) await onStage({ ...(detail || {}), stage: name, status });
+  };
+
   // 1. Detection pipeline runs first (Analyzers + Policy Engine)
-  const scanRecord = engine.simulateScan(serverContent, version || 1);
+  const scanRecord = await engine.runScan(request, version || 1, onStage);
 
   // 2. Check if detection and security checks are CLEAR
   if (scanRecord.verdict === 'PASS') {
     // Only once detection is clear are hashes generated and stored in blockchain
+    await stage('attest', 'start');
+    const attestedAt = Date.now();
     const attestation = buildAttestation(scanRecord);
 
     // Persist verified record
     store.saveScanRecord(scanRecord, attestation);
+    await stage('attest', 'done', {
+      ms: Date.now() - attestedAt,
+      attestationId: attestation.attestationId,
+    });
 
     // Push to transparency log (Merkle leaf)
+    await stage('log', 'start');
+    const loggedAt = Date.now();
     const leafData = attestation.attestationId;
     const leafHash = mcsCrypto.hashLeaf(leafData);
     const logIndex = store.appendLogLeaf(attestation.attestationId, leafHash);
+    await stage('log', 'done', { ms: Date.now() - loggedAt, logIndex, leafHash });
 
     // Anchor to blockchain
+    await stage('anchor', 'start');
+    const anchoredAt = Date.now();
     let anchored = simulateAnchor();
+    await stage('anchor', 'done', {
+      ms: Date.now() - anchoredAt,
+      blockNumber: anchored && anchored.blockNumber,
+    });
 
-    // Update watcher row (only for marketplace servers, not preview)
-    if (!isExternal) {
-      store.upsertWatcherRow({
-        serverId: serverContent.serverId,
-        watchedRef: 'main',
-        lastSeenSha: scanRecord.snapshot.commitSha,
-        lastFingerprint: scanRecord.snapshot.contentFingerprint,
-        lastVerdict: scanRecord.verdict,
-        lastCheckedAt: new Date().toISOString(),
-        status: 'up_to_date',
-      });
-    }
+    if (!isExternal) recordWatcher(request, scanRecord);
 
     return {
       scanRecord,
@@ -123,6 +167,12 @@ async function runFullPipeline(serverContent, version, isExternal = false) {
 
     // Save scan record locally for audit, but NEVER push to mcs_log_leaves or blockchain
     store.saveScanRecord(scanRecord, rejectionAttestation);
+    if (!isExternal) recordWatcher(request, scanRecord);
+    await stage('blocked', 'done', {
+      verdict: scanRecord.verdict,
+      attestationStatus: rejectionAttestation.status,
+      reason: scanRecord.snapshot.blockedReason || null,
+    });
 
     return {
       scanRecord,

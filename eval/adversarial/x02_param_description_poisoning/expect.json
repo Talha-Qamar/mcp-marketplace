@@ -1,0 +1,5 @@
+{
+ "expect": "DETECT",
+ "threat": "tool_poisoning",
+ "group": "text"
+}

@@ -1,0 +1,241 @@
+{
+  "_comment": [
+    "Ground truth for the fixture suite. Loaded by both tests/ and",
+    "scripts/eval_fixtures.py so the unit tests and the metrics report can",
+    "never disagree about what 'correct' means.",
+    "",
+    "'severity' / 'min_hops' / 'categories' describe the single tool in the",
+    "file. 'flagged: false' means the file must produce ZERO hits."
+  ],
+  "vulnerable": {
+    "v01_direct_concat.py": {
+      "tool": "list_directory",
+      "params": ["path"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "path"
+    },
+    "v02_fstring.py": {
+      "tool": "show_file",
+      "params": ["filename"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "filename",
+      "has_fstring_flow": true
+    },
+    "v03_intermediate_var.py": {
+      "tool": "query_database",
+      "params": ["q"],
+      "severity": "high",
+      "min_hops": 2,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "q",
+      "path": ["q", "cmd"]
+    },
+    "v04_three_hop_chain.py": {
+      "tool": "chained_command",
+      "params": ["q"],
+      "severity": "medium",
+      "min_hops": 4,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "q",
+      "path": ["q", "a", "b", "c"]
+    },
+    "v05_subprocess_shell_true.py": {
+      "tool": "grep_logs",
+      "params": ["pattern"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "pattern",
+      "shell_true_present": true
+    },
+    "v06_eval.py": {
+      "tool": "calculate",
+      "params": ["expr"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["exec"],
+      "sanitized": false,
+      "source_param": "expr"
+    },
+    "v07_exec_concat.py": {
+      "tool": "define_variable",
+      "params": ["code"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["exec"],
+      "sanitized": false,
+      "source_param": "code"
+    },
+    "v08_aliased_import.py": {
+      "tool": "run_command",
+      "params": ["cmd"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "cmd",
+      "sink_name": "os.system"
+    },
+    "v09_from_import.py": {
+      "tool": "run_command",
+      "params": ["cmd"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "cmd",
+      "sink_name": "os.system"
+    },
+    "v10_getattr_dispatch.py": {
+      "tool": "invoke",
+      "params": ["target", "method_name"],
+      "severity": "medium",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["dynamic"],
+      "sanitized": false,
+      "source_param": "method_name",
+      "sink_name": "getattr"
+    },
+    "v11_pickle_loads.py": {
+      "tool": "restore_state",
+      "params": ["payload"],
+      "severity": "medium",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["deserialize"],
+      "sanitized": false,
+      "source_param": "payload"
+    },
+    "v12_yaml_unsafe_load.py": {
+      "tool": "parse_config",
+      "params": ["text"],
+      "severity": "medium",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["deserialize"],
+      "sanitized": false,
+      "source_param": "text"
+    },
+    "v13_open_path_traversal.py": {
+      "tool": "read_note",
+      "params": ["user_path"],
+      "severity": "medium",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["file"],
+      "sanitized": false,
+      "source_param": "user_path"
+    },
+    "v14_async_tool.py": {
+      "tool": "list_directory_async",
+      "params": ["path"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "path"
+    },
+    "v15_class_method.py": {
+      "tool": "remove",
+      "params": ["target"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "target"
+    },
+    "v16_str_format.py": {
+      "tool": "list_directory",
+      "params": ["directory"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "directory"
+    },
+    "v17_percent_format.py": {
+      "tool": "list_directory",
+      "params": ["directory"],
+      "severity": "high",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "directory"
+    },
+    "v18_loop_join.py": {
+      "tool": "archive",
+      "params": ["names"],
+      "severity": "medium",
+      "min_hops": 3,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "names",
+      "path": ["names", "name", "parts"]
+    },
+    "v19_conditional_branch.py": {
+      "tool": "maybe_run",
+      "params": ["mode", "payload"],
+      "severity": "high",
+      "min_hops": 2,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": false,
+      "source_param": "payload",
+      "path": ["payload", "cmd"]
+    },
+    "v20_sanitized_still_flagged.py": {
+      "tool": "search",
+      "params": ["q"],
+      "severity": "low",
+      "min_hops": 1,
+      "n_hits": 1,
+      "categories": ["shell"],
+      "sanitized": true,
+      "source_param": "q"
+    }
+  },
+  "safe": {
+    "s01_subprocess_no_shell.py": { "flagged": false, "n_tools": 1 },
+    "s02_hardcoded_command.py": { "flagged": false, "n_tools": 1 },
+    "s03_untainted_after_reassignment.py": { "flagged": false, "n_tools": 1 },
+    "s04_constant_fstring.py": { "flagged": false, "n_tools": 1 },
+    "s05_tainted_never_reaches_sink.py": { "flagged": false, "n_tools": 1 },
+    "s06_allowlist_validated.py": { "flagged": false, "n_tools": 1 },
+    "s07_yaml_safe_load.py": { "flagged": false, "n_tools": 1 },
+    "s08_yaml_safe_loader.py": { "flagged": false, "n_tools": 1 },
+    "s09_no_tool_decorators.py": { "flagged": false, "n_tools": 0 },
+    "s10_pure_data_tool.py": { "flagged": false, "n_tools": 1 }
+  },
+  "edge": {
+    "e01_syntax_error.py": { "parse_ok": false, "n_tools": 0 },
+    "e02_empty.py": { "parse_ok": true, "n_tools": 0 },
+    "e03_non_utf8.py": { "parse_ok": true, "n_tools": 1, "materialized": true },
+    "e04_deeply_nested.py": { "parse_ok": true, "n_tools": 1, "flagged": true },
+    "e05_only_imports.py": { "parse_ok": true, "n_tools": 0 },
+    "e06_unusual_decorator.py": { "parse_ok": true, "n_tools": 1, "flagged": true }
+  }
+}
