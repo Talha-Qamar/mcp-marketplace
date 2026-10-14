@@ -80,19 +80,20 @@ function simulateAnchor() {
 
 /**
  * Run the complete scan pipeline for a server.
- * @param {object} serverContent - { serverId, name, description, long_description, github_url, tools }
+ * @param {object} request - { serverId, source, listing, declaredTools } (see engine.runScan)
  * @param {number} [version]
  * @param {boolean} [isExternal=false]
+ * @param {function} [onStage] - live progress callback
  * @returns {{ scanRecord, attestation, logIndex, anchored }}
  */
-async function runFullPipeline(serverContent, version, isExternal = false, onStage = null) {
+async function runFullPipeline(request, version, isExternal = false, onStage = null) {
   const stage = async (name, status, detail) => {
     // Reserved keys go LAST so a detail field can never clobber them.
     if (onStage) await onStage({ ...(detail || {}), stage: name, status });
   };
 
   // 1. Detection pipeline runs first (Analyzers + Policy Engine)
-  const scanRecord = await engine.simulateScan(serverContent, version || 1, onStage);
+  const scanRecord = await engine.runScan(request, version || 1, onStage);
 
   // 2. Check if detection and security checks are CLEAR
   if (scanRecord.verdict === 'PASS') {
@@ -128,10 +129,10 @@ async function runFullPipeline(serverContent, version, isExternal = false, onSta
     // Update watcher row (only for marketplace servers, not preview)
     if (!isExternal) {
       store.upsertWatcherRow({
-        serverId: serverContent.serverId,
-        watchedRef: 'main',
-        lastSeenSha: scanRecord.snapshot.commitSha,
-        lastFingerprint: scanRecord.snapshot.contentFingerprint,
+        serverId: request.serverId,
+        watchedRef: scanRecord.subject.ref || 'main',
+        lastSeenSha: scanRecord.subject.commit_sha,
+        lastFingerprint: scanRecord.subject.content_fingerprint,
         lastVerdict: scanRecord.verdict,
         lastCheckedAt: new Date().toISOString(),
         status: 'up_to_date',

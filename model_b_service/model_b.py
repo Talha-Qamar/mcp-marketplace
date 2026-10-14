@@ -45,6 +45,7 @@ DEFAULT_MODEL_DIR = Path(os.environ.get("MODEL_B_DIR", HERE / "model_b_v8"))
 EXTRACTOR = HERE / "js" / "extract_functions.js"
 REVIEW_CAL, FAIL_CAL = 0.40, 0.75
 MODEL_VERSION = "model-b-v8"
+CACHE_MAX = 200_000   # cached per-function score rows (about 100 MB at most)
 # base model pinned to an exact Hugging Face commit (part of the model hash)
 BASE_REVISION = os.environ.get("MODEL_B_BASE_REVISION", "5604afdc964f6c53782a6813140ade5216b99006")
 
@@ -102,8 +103,13 @@ def ts_functions(files):
     return res
 
 
-def extract_dir(root):
-    """All functions under root, with the same filters as the evaluation corpus."""
+def extract_dir(root, apply_filters=True, min_newlines=2):
+    """All functions under root, with the same filters as the evaluation corpus.
+
+    apply_filters=False / min_newlines=0 are for the MCP Secure contract path,
+    where ingestion has already chosen the files (including code it pulled back
+    from tests/ or dist/ because the server runs it) and short tool handlers
+    must not be dropped. The defaults keep evaluation behaviour unchanged."""
     root = Path(root)
     files = []
     targets = [root] if root.is_file() else sorted(root.rglob("*"))
@@ -111,7 +117,7 @@ def extract_dir(root):
         rel = f.name if root.is_file() else f.relative_to(root).as_posix()
         if not f.is_file() or f.suffix not in CODE_SUFFIX:
             continue
-        if not root.is_file() and (SKIP_DIR.search(rel) or SKIP_FILE.search(f.name)):
+        if apply_filters and not root.is_file() and (SKIP_DIR.search(rel) or SKIP_FILE.search(f.name)):
             continue
         try:
             if f.stat().st_size > MAX_FILE_BYTES:
@@ -125,14 +131,14 @@ def extract_dir(root):
         lang = CODE_SUFFIX[f.suffix]
         found = py_functions(text) if lang == "python" else ts.get(str(f), [])
         for name, code, s0, e0 in found:
-            if not code or len(code) > MAX_FUNC_CHARS or code.count("\n") < 2:
+            if not code or len(code) > MAX_FUNC_CHARS or code.count("\n") < min_newlines:
                 continue
             funcs.append({"file": rel, "func_name": name, "language": lang, "start_line": s0,
                           "end_line": e0, "code": code})
     return funcs[:MAX_FUNCS_PER_SCAN]
 
 
-def extract_files(files):
+def extract_files(files, apply_filters=True, min_newlines=2):
     """files: [{path, content}] (e.g. from an upload) -> functions. Written to a temp dir first."""
     with tempfile.TemporaryDirectory() as d:
         for f in files:
@@ -142,7 +148,7 @@ def extract_files(files):
             p = Path(d) / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(f["content"], encoding="utf-8")
-        return extract_dir(d)
+        return extract_dir(d, apply_filters=apply_filters, min_newlines=min_newlines)
 
 
 # ---------------------------------------------------------------------------- model
@@ -196,6 +202,7 @@ class ModelB:
             problem_type="multi_label_classification", torch_dtype=torch.float32)
         self.model = PeftModel.from_pretrained(base, self.model_dir).merge_and_unload().eval()
         self.hash = model_hash(self.model_dir)
+        self._cache = {}
 
     # windows: same as WindowDataset(train=False) in train_v8.py
     def _windows(self, text):
@@ -213,7 +220,22 @@ class ModelB:
         return [[self.tok.cls_token_id] + ids[a:b] + [self.tok.sep_token_id] for a, b in cand]
 
     def raw_scores(self, texts, batch=16):
-        """texts (already prepared model_code) -> array [n, K] of raw per-class scores."""
+        """texts (already prepared model_code) -> array [n, K] of raw per-class scores.
+
+        Scores are cached per text (sha256): the model is deterministic, and a
+        rescan or a new release of a server repeats most of its functions.
+        """
+        keys = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
+        miss = sorted({k: i for i, k in enumerate(keys) if k not in self._cache}.values())
+        if miss:
+            S = self._raw_scores_uncached([texts[i] for i in miss], batch)
+            if len(self._cache) + len(miss) > CACHE_MAX:
+                self._cache.clear()
+            for i, row in zip(miss, S):
+                self._cache[keys[i]] = row
+        return np.array([self._cache[k] for k in keys]).reshape(len(texts), len(self.classes))
+
+    def _raw_scores_uncached(self, texts, batch):
         torch = self.torch
         wins, owner = [], []
         for i, t in enumerate(texts):

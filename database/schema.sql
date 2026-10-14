@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     bio TEXT,
     website TEXT,
     github_username TEXT,
+    role TEXT DEFAULT 'publisher', -- publisher | admin
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -35,6 +36,10 @@ CREATE TABLE IF NOT EXISTS servers (
     security_status TEXT DEFAULT 'unverified', -- verified/unverified/flagged
     is_featured INTEGER DEFAULT 0,
     is_official INTEGER DEFAULT 0,
+    -- Submission gate (spec §9.1). Only 'approved' (and pre-gate 'legacy') rows
+    -- appear in the catalog: pending | in_review | approved | rejected | suspended | legacy
+    listing_status TEXT DEFAULT 'legacy',
+    source_json TEXT, -- where the code comes from: {kind: git|upload|local, ...}
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (author_id) REFERENCES users(id),
@@ -145,6 +150,7 @@ CREATE TABLE IF NOT EXISTS mcs_scan_records (
     ruleset_hash TEXT NOT NULL,
     model_hashes_json TEXT,
     attestation_json TEXT,
+    record_json TEXT, -- full ScanRecord: contract results, policy reasons, ingestion summary
     superseded INTEGER DEFAULT 0,
     is_external INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
@@ -190,4 +196,42 @@ CREATE TABLE IF NOT EXISTS mcs_external_requests (
     verdict TEXT,
     attestation_id TEXT,
     created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Submission gate (spec §9)
+-- ============================================================
+
+-- One row per submitted version. The row is also the scan job: the worker
+-- picks up 'queued' rows, and rows left in 'ingesting'/'scanning' by a crash
+-- are re-queued on start.
+CREATE TABLE IF NOT EXISTS submissions (
+    id TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL,
+    submitter_id TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    declared_tools_json TEXT,
+    -- queued | ingesting | scanning | approved | in_review | rejected | failed | superseded
+    state TEXT NOT NULL,
+    verdict TEXT,
+    scan_record_id TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (server_id) REFERENCES servers(id)
+);
+CREATE INDEX IF NOT EXISTS idx_submissions_state ON submissions(state);
+CREATE INDEX IF NOT EXISTS idx_submissions_server ON submissions(server_id);
+
+-- Admin decisions on REVIEW verdicts. Stored, not yet signed or logged
+-- (attestation of decisions is deferred with the blockchain work, spec §8).
+CREATE TABLE IF NOT EXISTS review_decisions (
+    id TEXT PRIMARY KEY,
+    submission_id TEXT NOT NULL,
+    scan_record_id TEXT,
+    reviewer_id TEXT NOT NULL,
+    decision TEXT NOT NULL, -- approve | reject
+    note TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (submission_id) REFERENCES submissions(id)
 );

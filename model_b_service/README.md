@@ -70,29 +70,32 @@ It returns:
 
 ## Marketplace
 
-Start the service, then the marketplace with `MODEL_B_URL`:
+The service also speaks the MCP Secure analyzer contract (spec §6): `GET /v1/health` and
+`POST /v1/analyze` (alias `POST /api/predict/code`, as on the proposal slides). The marketplace
+uses only these. `npm start` launches the service from `.venv` automatically when it is not
+already running on `MODEL_B_URL` (default `http://127.0.0.1:8765`).
 
-```bash
-MODEL_B_URL=http://127.0.0.1:8765 npm start
-```
+`/v1/analyze` receives the AnalysisBundle that ingestion built (the repository is cloned once, at a
+pinned commit, by the marketplace; this service no longer clones it). It scores every function in
+the bundle's code files and returns one finding per (function, class) at review level or above.
+Each finding has its real file, line and function span, plus the `tool_id` when the function is an
+MCP tool handler.
 
-`../src/mcpsecure/engine.js` → `simulateScan()` sends each server's tool source code (or, for
-older rows without source, the code blocks in its description), plus its `github_url` when that is
-a real public repo, to `/scan`. The scan record stores the service's model hash.
+`score` / `verdict_hint` from `/scan` are Model B on its own. In the marketplace, the policy
+(`ruleset.json`, rule `model_b_requires_corroboration`) lets a finding FAIL a server only when the
+AST analyzer reports a medium/high flow of the same threat in an overlapping function of the same
+file. Otherwise Model B can raise a server to REVIEW at most. See `MODEL_CARD.md` for why.
 
-`score` / `verdict_hint` above are Model B on its own. The marketplace does not use them directly:
-`fuseModelB()` combines the per-function `findings` with the AST taint analyzer's hits
-(`ruleset.json` → `modelBPolicy`). A finding can FAIL a server only when the AST analyzer reports a
-matching taint flow in the same function; otherwise Model B can raise the server to REVIEW at most.
-See `MODEL_CARD.md` for why.
-
-- Without `MODEL_B_URL`, the old simulated heuristic runs, and the analyzer card says `simulated`.
-- If the service is configured but unreachable, Model B scores 0.40 (**REVIEW**), never a silent PASS.
+- If the service is not running, or errors, the slot reports it and the policy refuses to PASS
+  (fail-closed). There is no simulated fallback for Model B.
+- The ruleset pins the released model hash (`analyzerPins.model_b`). A different model cannot decide
+  a PASS until it is released with `release.py`.
+- Contract check: `npm run conformance -- --url http://127.0.0.1:8765` from the repository root.
 
 ## Releasing a new model
 
 ```bash
-python release.py <kaggle-output-dir>   # copy files, parity check, write hash into ruleset.json
+python release.py <kaggle-output-dir>   # copy files, parity check, pin the hash in ruleset.json
 ```
 
 ## Determinism and speed

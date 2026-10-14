@@ -64,6 +64,20 @@ python -m pytest --cov=ast_taint      # with coverage
 python scripts/eval_fixtures.py       # confusion matrix over all 36 fixtures
 ```
 
+### As an MCP Secure analyzer service
+
+```bash
+python ast_taint_analyzer/service.py --port 8701     # from the repository root
+```
+
+`service.py` wraps the engine, unchanged, in the analyzer contract (`GET /v1/health`,
+`POST /v1/analyze`; spec §6). It analyses the Python tool handlers that ingestion discovered, and
+analyses every function only in files without decorated tools. Each sink hit becomes a finding in the
+shared taxonomy: shell → `command_injection`, exec/dynamic → `code_injection`, file →
+`path_traversal`, deserialize → `unsafe_deserialization`. Hits carry real file, line and function
+spans. `artifact_hash` is the SHA-256 of `config.py`. The marketplace starts the service itself on
+`npm start`; `tests/test_service.py` covers the wrapper.
+
 ### Library use
 
 ```python

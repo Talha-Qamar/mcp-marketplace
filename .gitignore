@@ -4,6 +4,8 @@ node_modules/
 # local database: rebuilt by `npm run seed` + first `npm start`; holds personal accounts
 database/marketplace.db
 database/*.db-journal
+database/*.db-wal
+database/*.db-shm
 
 # Ed25519 signing key: generated automatically on first start; never commit it
 database/mcs_key.json
@@ -37,3 +39,10 @@ __MACOSX/
 # Model B service: Python caches and files generated at run time
 __pycache__/
 model_b_service/js/normalize_strip_v8.js
+
+# Playwright output
+test-results/
+tests/e2e/report/
+
+# Raw evaluation output (several MB per run): regenerate with `npm run eval`; the .md reports are kept
+eval/results/*.jsonl

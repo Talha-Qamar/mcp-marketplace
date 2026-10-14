@@ -1,0 +1,5 @@
+{
+ "expect": "DETECT",
+ "threat": "unsafe_deserialization",
+ "group": "code"
+}

@@ -1,73 +1,46 @@
-const initSqlJs = require('sql.js');
+/**
+ * Marketplace database access (better-sqlite3).
+ *
+ * A real on-disk SQLite database with WAL journaling: writes go to the file
+ * incrementally instead of re-exporting the whole database on every statement
+ * (which is what sql.js did). The helper API (allRows / oneRow / runSql) is
+ * unchanged, so callers did not change.
+ *
+ * Schema: database/schema.sql is the full current schema (CREATE ... IF NOT
+ * EXISTS). database/migrations.js upgrades databases created by older builds;
+ * each migration runs once and is recorded in schema_migrations.
+ */
+
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { runMigrations } = require('../database/migrations');
 
-const dbPath = path.join(__dirname, '..', 'database', 'marketplace.db');
+const dbPath = process.env.MCS_DB_PATH || path.join(__dirname, '..', 'database', 'marketplace.db');
 
 let db = null;
 
-function saveDb() {
-    if (db) {
-        const data = db.export();
-        const buffer = Buffer.from(data);
-        fs.writeFileSync(dbPath, buffer);
-    }
+/** better-sqlite3 binds only numbers, strings, bigints, buffers and null. */
+function bindable(params) {
+    return (params || []).map(v => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
 }
 
 async function initDb() {
-    const SQL = await initSqlJs();
-    try {
-        if (fs.existsSync(dbPath)) {
-            const fileBuffer = fs.readFileSync(dbPath);
-            db = new SQL.Database(fileBuffer);
-        } else {
-            db = new SQL.Database();
-        }
-    } catch (e) {
-        db = new SQL.Database();
-    }
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
 
-    db.run('PRAGMA foreign_keys = ON');
+    // Upgrade older databases first, so schema.sql's indexes and new tables
+    // never meet a table that is missing a column they reference.
+    const applied = runMigrations(db);
+    if (applied.length > 0) console.log(`[DB] Applied migration(s): ${applied.join(', ')}`);
 
     const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
-    if (fs.existsSync(schemaPath)) {
-        const schema = fs.readFileSync(schemaPath, 'utf8');
-        db.exec(schema);
-        saveDb();
-    }
-
-    migrate();
+    if (fs.existsSync(schemaPath)) db.exec(fs.readFileSync(schemaPath, 'utf8'));
+    runMigrations(db); // a brand-new database: record the migrations as applied
 
     return db;
-}
-
-/**
- * Additive migrations for databases created before a column existed.
- *
- * schema.sql uses CREATE TABLE IF NOT EXISTS, so a pre-existing marketplace.db
- * never picks up new columns on its own. Each ALTER is idempotent by way of the
- * catch: SQLite throws "duplicate column name" when it has already been applied.
- */
-function migrate() {
-    const additiveColumns = [
-        `ALTER TABLE tools ADD COLUMN source_code TEXT`,
-        `ALTER TABLE tools ADD COLUMN source_language TEXT`,
-    ];
-
-    let applied = 0;
-    for (const sql of additiveColumns) {
-        try {
-            db.run(sql);
-            applied++;
-        } catch (e) {
-            // Column already present — expected on every boot after the first.
-        }
-    }
-    if (applied > 0) {
-        saveDb();
-        console.log(`[DB] Applied ${applied} additive migration(s).`);
-    }
 }
 
 function getDb() {
@@ -76,31 +49,25 @@ function getDb() {
 }
 
 function allRows(sql, params = []) {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) stmt.bind(params);
-    const results = [];
-    while (stmt.step()) {
-        results.push(stmt.getAsObject());
-    }
-    stmt.free();
-    return results;
+    return db.prepare(sql).all(bindable(params));
 }
 
 function oneRow(sql, params = []) {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) stmt.bind(params);
-    let result = null;
-    if (stmt.step()) {
-        result = stmt.getAsObject();
-    }
-    stmt.free();
-    return result;
+    return db.prepare(sql).get(bindable(params)) || null;
 }
 
 function runSql(sql, params = []) {
-    db.run(sql, params);
-    saveDb();
+    return db.prepare(sql).run(bindable(params));
 }
+
+/** Run fn inside one transaction (all-or-nothing). */
+function transaction(fn) {
+    return db.transaction(fn)();
+}
+
+// Catalog visibility (spec §9.1): only servers with an approved scan, plus the
+// seeded legacy catalog rows that predate the gate.
+const LISTED = `s.listing_status IN ('approved', 'legacy')`;
 
 function getServers(filters = {}) {
     let query = `
@@ -108,7 +75,7 @@ function getServers(filters = {}) {
         FROM servers s
         JOIN users u ON s.author_id = u.id
         JOIN categories c ON s.category_id = c.id
-        WHERE 1=1
+        WHERE ${LISTED}
     `;
     const params = [];
 
@@ -173,7 +140,7 @@ function getServers(filters = {}) {
         FROM servers s
         JOIN users u ON s.author_id = u.id
         JOIN categories c ON s.category_id = c.id
-        WHERE 1=1
+        WHERE ${LISTED}
     `;
     const countParams = [];
     if (filters.q) {
@@ -239,14 +206,16 @@ function createServer(data) {
     const now = new Date().toISOString();
 
     runSql(`
-        INSERT INTO servers (id, slug, name, author_id, description, long_description, github_url, npm_package, language, hosting, license, version, category_id, security_status, is_featured, is_official, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO servers (id, slug, name, author_id, description, long_description, github_url, npm_package, language, hosting, license, version, category_id, security_status, is_featured, is_official, source_json, listing_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
         id, data.slug, data.name, data.author_id, data.description, data.long_description || '',
         data.github_url || '', data.npm_package || '', data.language || 'other',
         data.hosting || 'local', data.license || 'MIT', data.version || '1.0.0',
         data.category_id, data.security_status || 'unverified', data.is_featured ? 1 : 0,
-        data.is_official ? 1 : 0, now, now
+        data.is_official ? 1 : 0,
+        data.source ? JSON.stringify(data.source) : null,
+        data.listing_status || 'pending', now, now
     ]);
 
     // Add tools
@@ -384,7 +353,7 @@ function createUser(data) {
 }
 
 function getStats() {
-    const serverCount = oneRow(`SELECT COUNT(*) as count FROM servers`);
+    const serverCount = oneRow(`SELECT COUNT(*) as count FROM servers s WHERE ${LISTED}`);
     const userCount = oneRow(`SELECT COUNT(*) as count FROM users`);
     const installCount = oneRow(`SELECT SUM(install_count) as count FROM servers`);
     const toolCount = oneRow(`SELECT COUNT(*) as count FROM tools`);
@@ -419,7 +388,7 @@ function getFeaturedServers(limit = 6) {
         FROM servers s
         JOIN users u ON s.author_id = u.id
         JOIN categories c ON s.category_id = c.id
-        WHERE s.is_featured = 1
+        WHERE s.is_featured = 1 AND ${LISTED}
         ORDER BY s.stars DESC
         LIMIT ?
     `, [limit]);
@@ -436,6 +405,7 @@ function getPopularServers(limit = 8) {
         FROM servers s
         JOIN users u ON s.author_id = u.id
         JOIN categories c ON s.category_id = c.id
+        WHERE ${LISTED}
         ORDER BY s.stars DESC
         LIMIT ?
     `, [limit]);
@@ -452,6 +422,7 @@ function getRecentServers(limit = 8) {
         FROM servers s
         JOIN users u ON s.author_id = u.id
         JOIN categories c ON s.category_id = c.id
+        WHERE ${LISTED}
         ORDER BY s.created_at DESC
         LIMIT ?
     `, [limit]);
@@ -465,6 +436,7 @@ function getRecentServers(limit = 8) {
 module.exports = {
     initDb,
     getDb,
+    transaction,
     getServers,
     getServerBySlug,
     createServer,

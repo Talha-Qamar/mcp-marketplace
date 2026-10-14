@@ -192,26 +192,28 @@ function realAnalysisBadge(tooltip = '') {
  * Never hardcode this — the whole point is that the label tracks reality.
  */
 function analyzerBadge(a) {
-  if (a.engine === 'ast-taint') {
-    return realAnalysisBadge(
-      'Real Python AST taint analysis (ast_taint). Parsed, never executed. ' +
-      'Parameter-level taint tracking with alias resolution and a frozen severity table.'
-    );
+  if (a.status === 'unavailable' || a.status === 'error') {
+    return `<span class="mcs-sim-badge" style="background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.35)" title="${escapeHtml((a.evidence || [])[0] || '')}">${a.status === 'error' ? 'ERROR' : 'NOT RUNNING'}</span>`;
   }
-  if (a.engine === 'heuristic-fallback') {
-    return simBadge(
-      'Degraded: the real analyzer could not run, so this fell back to the regex ' +
-      'heuristic. The reason is the first line of the evidence below.'
-    );
+  if (a.status === 'not_applicable') {
+    return `<span class="mcs-sim-badge" title="Nothing in this server this analyzer can read (e.g. no Python for the AST analyzer)">N/A</span>`;
   }
-  if (a.engine === 'heuristic') {
-    return simBadge('No analysable Python source in this candidate — regex heuristic only.');
+  if (a.engine === 'static') {
+    return realAnalysisBadge('Deterministic static analysis of the real source code. Parsed, never executed.');
   }
-  return simBadge('In production: fine-tuned ML model. Here: deterministic heuristics.');
+  if (a.engine === 'model') {
+    return realAnalysisBadge('Trained model served over the MCP Secure analyzer contract. Deterministic CPU inference.');
+  }
+  if (a.engine === 'agent') {
+    return realAnalysisBadge('Verification agent (advisory only — never changes the verdict).');
+  }
+  return simBadge(a.fallbackUsed
+    ? 'Built-in heuristic stand-in: the trained model for this slot is not configured yet.'
+    : 'Heuristic analyzer.');
 }
 
 function astEngineOf(analyzers) {
-  const ast = (analyzers || []).find(a => a.analyzer === 'AST_TAINT');
+  const ast = (analyzers || []).find(a => a.analyzer === 'ast_taint' || a.analyzer === 'AST_TAINT');
   return ast ? ast.engine : undefined;
 }
 
@@ -230,9 +232,13 @@ function setFastMode(value) {
 
 const STAGE_LABELS = {
   parse: 'Parse source & extract tool views',
-  ast_taint: 'AST Taint Analysis',
-  model_b: 'Model B — code obfuscation',
-  model_a: 'Model A — text poisoning / PMA',
+  ingest: 'Ingest: pin source, select files, discover tools',
+  ingest_checks: 'Declared vs discovered tools',
+  ast_taint: 'AST taint analyzer',
+  model_b: 'Model B — code classifier',
+  model_a: 'Model A — tool poisoning / preference manipulation',
+  model_c: 'Model C — verification agent (advisory)',
+  triage: 'Model C — verification agent (advisory)',
   policy: 'Deterministic policy engine',
   fingerprint: 'Fingerprint & commit pin',
   attest: 'Ed25519 attestation',
@@ -249,6 +255,9 @@ function stageDetailText(e) {
       : 'markdown fallback (no stored source)');
   }
   if (e.codeChars !== undefined) bits.push(`code ${e.codeChars}c · text ${e.textChars}c`);
+  if (e.files !== undefined) bits.push(`${e.files} file(s) · ${(e.languages || []).join('/') || 'no code'} · ${e.tools} tool(s) (${e.toolDiscovery})`);
+  if (e.commitSha) bits.push(`commit ${String(e.commitSha).slice(0, 12)}`);
+  if (e.error) bits.push(`error: ${e.error}`);
   if (e.engine) bits.push(`engine: ${e.engine}`);
   if (e.findings !== undefined) bits.push(`${e.findings} finding(s)`);
   if (e.score !== undefined) bits.push(`score ${(e.score * 100).toFixed(0)}%`);
@@ -390,9 +399,9 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
       <div class="mcs-stage mcs-stage-pending" id="stage-parse">
         <div class="mcs-stage-icon">📄</div>
         <div class="mcs-stage-body">
-          <div class="mcs-stage-title">Step 1: Parse AST &amp; Extract Tools ${astEngineOf(analyzers) === 'ast-taint'
-            ? realAnalysisBadge('Real Python ast.parse() — tool functions extracted from the parsed tree')
-            : simBadge('AST parser & tool interface extraction')}</div>
+          <div class="mcs-stage-title">Step 1: Ingest source &amp; discover tools ${scanRecord.ingest
+            ? realAnalysisBadge('Real ingestion: pinned source, shared file filter, static tool discovery (Python ast / TypeScript compiler). Nothing is executed.')
+            : simBadge('Legacy scan record (before the ingestion pipeline)')}</div>
           <div class="mcs-stage-content" id="parse-content"></div>
         </div>
         <div class="mcs-stage-spinner" id="parse-spinner"></div>
@@ -510,18 +519,19 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
   // Real measurements from the backend's parse stage when we have them.
   // This used to invent both numbers (one of them with Math.random), which
   // made the panel non-deterministic and simply untrue.
-  const parseFacts = liveFacts && liveFacts.parse;
-  document.getElementById('parse-content').innerHTML = `
+  const ing = scanRecord.ingest;
+  const subj = scanRecord.subject || {};
+  document.getElementById('parse-content').innerHTML = ing ? `
     <div style="color:var(--text-2);font-size:0.875rem;">
-      ${parseFacts && parseFacts.codeOrigin === 'tool_source'
-        ? `Parsed <strong style="color:var(--text-1)">${parseFacts.sourcedTools}/${parseFacts.toolCount}</strong> tool implementation(s) from stored source, plus the natural-language view (metadata + descriptions).`
-        : 'Extracted the code view (tool source, or implementation snippets scraped from the description) and the natural-language text view (metadata + descriptions).'}
-      ${parseFacts
-        ? `<br>Code view length: <strong style="color:var(--text-1)">${parseFacts.codeChars} chars</strong> |
-           Text view length: <strong style="color:var(--text-1)">${parseFacts.textChars} chars</strong>`
-        : ''}
-    </div>
-  `;
+      Source <strong style="color:var(--text-1)">${escapeHtml(subj.source_kind || '')}</strong>
+      ${subj.repo_url ? `· ${escapeHtml(subj.repo_url)}${subj.subdir ? '/' + escapeHtml(subj.subdir) : ''}` : ''}
+      ${subj.commit_sha ? `· commit <code class="mcs-hash-short">${subj.commit_sha.slice(0, 12)}</code>` : '· not a git commit (local/upload)'}
+      <br><strong style="color:var(--text-1)">${ing.files.length}</strong> code file(s) ·
+      <strong style="color:var(--text-1)">${ing.tools.length}</strong> MCP tool(s) found (discovery: ${escapeHtml(ing.tool_discovery)})
+      <br>Content fingerprint (code + tools + listing): <code class="mcs-hash-short">${escapeHtml(String(subj.content_fingerprint || '').slice(0, 30))}…</code>
+      ${ing.tools.length ? `<ul style="margin:0.5rem 0 0 1rem;font-size:0.8rem;">${ing.tools.map(t => `<li><code>${escapeHtml(t.name)}</code> — ${escapeHtml(t.file)}:${t.handler.start_line} <span style="color:var(--text-3)">(${escapeHtml(t.discovered_by)})</span></li>`).join('')}</ul>` : ''}
+      ${(ing.notes || []).length ? `<div style="margin-top:0.4rem;color:var(--warning);font-size:0.78rem;">${ing.notes.map(escapeHtml).join('<br>')}</div>` : ''}
+    </div>` : '<div style="color:var(--text-2);font-size:0.875rem;">Legacy scan record: no ingestion data.</div>';
   stageDone('stage-parse');
 
   // ── 2. Animate: Detection Analyzers (parallel models) ─────────────────────
@@ -535,7 +545,7 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
 
   const grid = document.getElementById('analyzers-grid');
   grid.innerHTML = analyzers.map(a => {
-    const info = analyzerNames[a.analyzer] || {};
+    const info = analyzerNames[a.analyzer] || { label: a.display_name, sublabel: a.sublabel, color: '#06b6d4' };
     return `
     <div class="mcs-analyzer-card" id="ac-${a.analyzer}">
       <div class="mcs-analyzer-header">
@@ -588,8 +598,11 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
   stageStart('stage-policy');
   await stageDelay(STAGE_DELAY);
 
-  const maxScore = Math.max(...analyzers.map(a => a.score));
-  const astFired = analyzers.find(a => a.analyzer === 'AST_TAINT')?.score >= 0.6;
+  const pol = scanRecord.policy;
+  const maxScore = pol ? pol.max_effective_score : Math.max(0, ...analyzers.map(a => a.score));
+  const reasonRows = pol && pol.reasons.length
+    ? pol.reasons.map(r => `<li><code>${escapeHtml(r.rule)}</code>${r.verdict ? ` → <strong>${r.verdict}</strong>` : ''}: ${escapeHtml(r.message)}</li>`).join('')
+    : '<li>No rule fired: every analyzer ran, coverage is sufficient and no finding reached the review threshold.</li>';
 
   document.getElementById('policy-content').innerHTML = `
     <div class="mcs-kv-grid">
@@ -597,12 +610,11 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
       <span class="mcs-kv-val">${policyVersion}</span>
       <span class="mcs-kv-key">Ruleset Hash</span>
       <code class="mcs-hash mcs-hash-short">${rulesetHash}</code>
-      <span class="mcs-kv-key">Max Analyzer Threat Score</span>
+      <span class="mcs-kv-key">Highest Effective Score</span>
       <span class="mcs-kv-val">${(maxScore * 100).toFixed(0)}%</span>
-      <span class="mcs-kv-key">AST Hard-Fail Triggered</span>
-      <span class="mcs-kv-val" style="color:${astFired ? 'var(--error)' : 'var(--success)'}">${astFired ? 'YES → Hard Rejection' : 'No'}</span>
-      <span class="mcs-kv-key">Policy Gate Rule</span>
-      <span class="mcs-kv-val">Only PASS clears to hash generation &amp; blockchain storage</span>
+    </div>
+    <div style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-2);">Rules that fired:
+      <ul style="margin:0.35rem 0 0 1.1rem;padding:0;line-height:1.6;">${reasonRows}</ul>
     </div>
   `;
   stageDone('stage-policy');
@@ -626,24 +638,17 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
     stageStart('stage-modelc');
     await stageDelay(STAGE_DELAY * 1.2);
 
-    const flaggedEvidence = analyzers.flatMap(a => a.evidence).filter(e => !e.startsWith('No '));
-    const rationale = flaggedEvidence.length > 0
-      ? `Reviewing flagged signals: "${flaggedEvidence[0]}". Potential deceptive or manipulative pattern.`
-      : 'Reviewing analyzer outputs. Awaiting human verification.';
-
+    const tri = scanRecord.triage;
+    const rec = tri && tri.recommendation;
     document.getElementById('modelc-content').innerHTML = `
       <div class="mcs-modelc-panel">
         <div class="mcs-modelc-icon">🤖</div>
         <div>
-          <strong>Model C Security Reasoning:</strong>
-          <p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">${escapeHtml(rationale)}</p>
-          <p style="margin:0;color:var(--text-2);font-size:0.875rem;">
-            Recommendation: <strong style="color:var(--warning)">Escalate to human reviewer.</strong>
-            Blockchain storage remains locked until manual sign-off.
-          </p>
-          <div class="mcs-modelc-note">
-            Blockchain protection: Hashes are withheld until approved by a reviewer.
-          </div>
+          <strong>Model C — verification agent (advisory):</strong>
+          ${rec ? `
+          <p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">Recommendation: <strong>${escapeHtml(rec.decision)}</strong> — ${escapeHtml(rec.rationale)}</p>`
+          : `<p style="margin:0.5rem 0;color:var(--text-2);font-size:0.875rem;">${tri ? `Model C ${escapeHtml(tri.status)}${tri.error ? ': ' + escapeHtml(tri.error) : ''}.` : 'Model C is not configured yet.'} The submission goes to the admin review queue.</p>`}
+          <div class="mcs-modelc-note">Model C never changes the verdict: an admin approves or rejects every REVIEW.</div>
         </div>
       </div>
     `;
@@ -1349,13 +1354,13 @@ const MCSVerifier = (() => {
         </div>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Candidate Server Ref (repo URL)</label>
-          <input class="input" id="vf-candidate-ref" value="https://github.com/acme-corp/crm-mcp-connector" placeholder="https://github.com/org/repo">
+          <input class="input" id="vf-candidate-ref" value="https://github.com/modelcontextprotocol/servers/tree/main/src/fetch" placeholder="https://github.com/org/repo">
         </div>
         <div style="margin-bottom:1.5rem;">
           <span style="color:var(--text-3);font-size:0.8125rem;">Or use a seeded external candidate:</span>
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;">
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/acme-corp/crm-mcp-connector';document.getElementById('vf-requester').value='Acme MCP Market'">Acme CRM Connector</button>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/badseller/malware-mcp';document.getElementById('vf-requester').value='Beta Marketplace'">Malware MCP (for demo)</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='https://github.com/modelcontextprotocol/servers/tree/main/src/fetch';document.getElementById('vf-requester').value='Acme MCP Market'">Official fetch server</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('vf-candidate-ref').value='demo:shell-runner';document.getElementById('vf-requester').value='Beta Marketplace'">Shell Runner (bundled demo)</button>
           </div>
         </div>
         <button class="btn btn-primary" onclick="MCSVerifier.runExternal()">
@@ -1389,7 +1394,7 @@ const MCSVerifier = (() => {
         <p style="color:var(--text-2);font-size:0.875rem;">This shows what the MCP tool call looks like when an external client calls MCP Secure's own MCP server.</p>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Candidate Ref</label>
-          <input class="input" id="vf-ep-ref" value="https://github.com/acme-corp/crm-mcp-connector">
+          <input class="input" id="vf-ep-ref" value="https://github.com/modelcontextprotocol/servers/tree/main/src/fetch">
         </div>
         <div class="form-field" style="margin-bottom:1rem;">
           <label class="label">Requester</label>

@@ -1,0 +1,5 @@
+{
+ "expect": "NOT_PASS",
+ "threat": "command_injection",
+ "group": "hiding"
+}

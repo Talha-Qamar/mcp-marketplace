@@ -1,0 +1,6 @@
+{
+ "expect": "DETECT",
+ "threat": "tool_poisoning",
+ "group": "text",
+ "known_gap": "Model A (Talha): cross-tool instruction (tool shadowing)"
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcp-secure.dev/contracts/analyzer-health.schema.json",
+  "title": "AnalyzerHealth",
+  "description": "GET /v1/health response (spec §6.1).",
+  "type": "object",
+  "required": ["id", "display_name", "version", "artifact_hash", "engine", "consumes", "languages", "threats", "contract_version"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "display_name": { "type": "string" },
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "artifact_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "engine": { "enum": ["model", "static", "heuristic", "agent"] },
+    "consumes": { "type": "array", "items": { "enum": ["server", "files", "metadata_files", "tools", "declared_tools", "findings"] } },
+    "languages": { "type": "array", "items": { "type": "string" } },
+    "threats": { "type": "array", "items": { "type": "string" } },
+    "contract_version": { "const": "1" }
+  }
+}

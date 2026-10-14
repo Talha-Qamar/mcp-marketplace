@@ -89,27 +89,13 @@ router.get('/servers/:slug', (req, res) => {
     }
 });
 
-// Create server
+// Create server: replaced by the submission gate. A listing is created only
+// through POST /api/v1/submissions, which scans it before it can be listed.
 router.post('/servers', requireAuth, (req, res) => {
-    try {
-        const data = { ...req.body, author_id: req.user.id };
-        // Basic validation
-        if (!data.name || !data.slug || !data.category_id) {
-            return res.status(400).json({ error: 'Name, slug, and category_id are required' });
-        }
-        
-        // Check for existing slug
-        const existing = db.getServerBySlug(data.slug);
-        if (existing) {
-            return res.status(400).json({ error: 'Server with this slug already exists' });
-        }
-
-        const newServer = db.createServer(data);
-        res.status(201).json(newServer);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to create server' });
-    }
+    res.status(410).json({
+        error: 'Listings are created through the security gate: POST /api/v1/submissions',
+        submissions_url: '/api/v1/submissions',
+    });
 });
 
 // Update server
@@ -125,7 +111,11 @@ router.put('/servers/:slug', requireAuth, (req, res) => {
             return res.status(403).json({ error: 'Not authorized to update this server' });
         }
 
-        const updatedServer = db.updateServer(req.params.slug, req.body);
+        // Publishers edit listing text only. Verdict-derived fields (security
+        // status, featured/official flags) and the code source cannot be
+        // self-set; new code goes through a new submission.
+        const { security_status, is_featured, is_official, github_url, ...editable } = req.body || {};
+        const updatedServer = db.updateServer(req.params.slug, editable);
         res.json(updatedServer);
     } catch (error) {
         console.error(error);

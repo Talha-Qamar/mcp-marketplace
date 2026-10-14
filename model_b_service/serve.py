@@ -12,12 +12,18 @@ Model B scan service (HTTP, JSON). Standard library server; one model instance, 
 
 Scores are on the marketplace scale (review >= 0.40, fail >= 0.75; ruleset.json).
 
+MCP Secure analyzer contract (spec section 6), served alongside the endpoints above:
+  GET  /v1/health                      -> contracts/analyzer-health.schema.json
+  POST /v1/analyze  {"bundle": {...}}  -> contracts/analyzer-result.schema.json
+  POST /api/predict/code               alias of /v1/analyze (proposal slide 7)
+
 Usage: python serve.py [--host 127.0.0.1] [--port 8765]
 """
 import argparse
 import json
 import re
 import shutil
+import sys
 import subprocess
 import tempfile
 import threading
@@ -25,6 +31,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import model_b
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services" / "analyzer_kit"))
+import analyzer_kit as kit  # noqa: E402
+
+CONTRACT_ID = "model_b"
+CONTRACT_PATHS = ("/v1/analyze", "/api/predict/code")
+CODE_LANGS = ("python", "typescript", "javascript")
 
 MAX_BODY = 20 * 1024 * 1024
 GITHUB_RE = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
@@ -107,6 +120,61 @@ def github_functions(url, ref=None):
         shutil.rmtree(d, ignore_errors=True)
 
 
+def contract_identity(m):
+    return {"id": CONTRACT_ID, "version": model_b.MODEL_VERSION, "artifact_hash": "sha256:" + m.hash, "engine": "model"}
+
+
+def contract_health(m):
+    return {
+        **contract_identity(m),
+        "display_name": "Model B — code classifier",
+        "description": "UniXcoder + LoRA; scores every function for six vulnerability classes",
+        "consumes": ["files", "tools"],
+        "languages": list(CODE_LANGS),
+        "threats": sorted({model_b.CLASS_INFO[c][0] for c in m.classes}),
+        "contract_version": kit.CONTRACT_VERSION,
+    }
+
+
+def contract_analyze(m, bundle):
+    """Score every function in the bundle's code files; one finding per (function, class) at review level or above."""
+    code = [{"path": f["path"], "content": f["content"]} for f in bundle.get("files", []) if f.get("language") in CODE_LANGS]
+    if not code:
+        return kit.result(contract_identity(m), "not_applicable", notes=["no Python/TypeScript/JavaScript source in bundle"])
+    # Ingestion already selected the files: no re-filtering. The model was
+    # trained on functions of 3+ lines; here 2-line functions are scored too
+    # (`def f(x): return os.system(x)` is a whole helper), and one-liners only
+    # when they are an MCP tool handler, so short code cannot slip past.
+    funcs = [f for f in model_b.extract_files(code, apply_filters=False, min_newlines=0)
+             if f["code"].count("\n") >= 1
+             or kit.tool_for_span(bundle, f["file"], f.get("start_line") or 1, f.get("end_line") or f.get("start_line") or 1)]
+    scored = m.score_functions(funcs)
+    findings = []
+    for r in scored:
+        start, end = r.get("start_line") or 1, r.get("end_line") or r.get("start_line") or 1
+        tool_id = kit.tool_for_span(bundle, r["file"], start, end)
+        for cls in m.classes:
+            s = r["calibrated"][cls]
+            if s < model_b.REVIEW_CAL:
+                continue
+            threat, cwe = model_b.CLASS_INFO[cls]
+            findings.append({
+                "finding_id": kit.finding_id(CONTRACT_ID, r["file"], start, r["func_name"], cls),
+                "threat": threat,
+                "cwe": cwe,
+                "score": float(s),
+                "severity": "high" if s >= model_b.FAIL_CAL else "medium",
+                "location": {"file": r["file"], "line": start,
+                             "function": {"name": r["func_name"], "start_line": start, "end_line": end},
+                             "tool_id": tool_id},
+                "summary": "%s (%s) in %s, model score %.2f" % (threat, cwe, r["func_name"], s),
+                "details": {"class": cls, "raw": r["raw"][cls], "calibrated": r["calibrated"]},
+            })
+    langs = sorted({f["language"] for f in funcs}) or sorted({f.get("language") for f in bundle.get("files", []) if f.get("language") in CODE_LANGS})
+    return kit.result(contract_identity(m), "ok", findings, units_total=len(funcs), units_analyzed=len(scored),
+                      languages=langs, notes=[] if funcs else ["no functions of 3+ lines to score"])
+
+
 class Handler(BaseHTTPRequestHandler):
     model = None
     lock = threading.Lock()
@@ -120,9 +188,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):
-        print("[model-b]", self.address_string(), fmt % args, flush=True)
+        try:  # best effort: a closed stdout (parent crashed) must not drop the response
+            print("[model-b]", self.address_string(), fmt % args, flush=True)
+        except (OSError, ValueError):
+            pass
 
     def do_GET(self):
+        if self.path == "/v1/health":
+            return self._send(200, contract_health(self.model))
         if self.path != "/health":
             return self._send(404, {"error": "not found"})
         m = self.model
@@ -131,6 +204,8 @@ class Handler(BaseHTTPRequestHandler):
                          "marketplace_thresholds": {"review": model_b.REVIEW_CAL, "fail": model_b.FAIL_CAL}})
 
     def do_POST(self):
+        if self.path in CONTRACT_PATHS:
+            return self._contract_post()
         if self.path != "/scan":
             return self._send(404, {"error": "not found"})
         n = int(self.headers.get("Content-Length") or 0)
@@ -161,6 +236,22 @@ class Handler(BaseHTTPRequestHandler):
         with self.lock:
             res = self.model.scan(funcs)
         res["sources"] = sources
+        self._send(200, res)
+
+
+    def _contract_post(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0 or n > MAX_BODY:
+            return self._send(413 if n > MAX_BODY else 400, {"error": "body required (max 20 MB)"})
+        try:
+            bundle = json.loads(self.rfile.read(n))["bundle"]
+        except Exception:
+            return self._send(400, {"error": "body must be {\"bundle\": AnalysisBundle}"})
+        try:
+            with self.lock:
+                res = contract_analyze(self.model, bundle)
+        except Exception as e:
+            res = kit.result(contract_identity(self.model), "error", error="%s: %s" % (type(e).__name__, e))
         self._send(200, res)
 
 

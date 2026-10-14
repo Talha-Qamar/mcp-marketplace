@@ -1,22 +1,25 @@
-const initSqlJs = require('sql.js');
+const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = path.join(__dirname, 'marketplace.db');
+const dbPath = process.env.MCS_DB_PATH || path.join(__dirname, 'marketplace.db');
 const schemaPath = path.join(__dirname, 'schema.sql');
 
 async function seed() {
-    const SQL = await initSqlJs();
 
     // Remove existing DB to start fresh
-    if (fs.existsSync(dbPath)) {
-        fs.unlinkSync(dbPath);
-        console.log('Removed old database.');
+    for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+        if (fs.existsSync(f)) fs.unlinkSync(f);
     }
+    if (!fs.existsSync(dbPath)) console.log('Removed old database (if any).');
 
-    const db = new SQL.Database();
+    const db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+    const bindable = p => (p || []).map(v => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
+    const run = (sql, params) => db.prepare(sql).run(bindable(params));
+    db.exec('BEGIN');
     const schema = fs.readFileSync(schemaPath, 'utf8');
     db.exec(schema);
 
@@ -40,7 +43,7 @@ async function seed() {
     for (const u of userData) {
         const id = uuidv4();
         users.push({ id, username: u.username });
-        db.run(`INSERT INTO users (id, username, email, password_hash, display_name, bio, github_username, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        run(`INSERT INTO users (id, username, email, password_hash, display_name, bio, github_username, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, u.username, `${u.username}@example.com`, passwordHash, u.display, u.bio, u.github, now, now]);
     }
     console.log(`✓ Created ${users.length} users`);
@@ -63,7 +66,7 @@ async function seed() {
     for (const c of categoriesData) {
         const id = uuidv4();
         categoryMap[c.slug] = id;
-        db.run(`INSERT INTO categories (id, slug, name, description, icon, server_count) VALUES (?, ?, ?, ?, ?, ?)`,
+        run(`INSERT INTO categories (id, slug, name, description, icon, server_count) VALUES (?, ?, ?, ?, ?, ?)`,
             [id, c.slug, c.name, c.description, c.icon, 0]);
     }
     console.log(`✓ Created ${categoriesData.length} categories`);
@@ -80,7 +83,7 @@ async function seed() {
     for (const t of tagsData) {
         const id = uuidv4();
         tagMap[t] = id;
-        db.run(`INSERT INTO tags (id, slug, name) VALUES (?, ?, ?)`, [id, t, t.replace(/-/g, ' ')]);
+        run(`INSERT INTO tags (id, slug, name) VALUES (?, ?, ?)`, [id, t, t.replace(/-/g, ' ')]);
     }
     console.log(`✓ Created ${tagsData.length} tags`);
 
@@ -97,7 +100,7 @@ async function seed() {
     ];
 
     for (const cl of clientsData) {
-        db.run(`INSERT INTO clients (id, slug, name, description, website, type, mcp_support, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        run(`INSERT INTO clients (id, slug, name, description, website, type, mcp_support, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [uuidv4(), cl.slug, cl.name, cl.description, cl.website, cl.type, cl.mcp_support, now]);
     }
     console.log(`✓ Created ${clientsData.length} clients`);
@@ -139,7 +142,7 @@ async function seed() {
         const transport = s.transport || (s.hosting === 'remote' ? 'Streamable HTTP' : 'stdio');
         const auth = s.authentication || 'None';
 
-        db.run(`
+        run(`
             INSERT INTO servers (id, slug, name, author_id, description, long_description, github_url, npm_package, language, hosting, transport, authentication, license, version, stars, forks, install_count, category_id, security_status, is_featured, is_official, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
@@ -154,14 +157,14 @@ async function seed() {
         ]);
 
         // Update category count
-        db.run(`UPDATE categories SET server_count = server_count + 1 WHERE id = ?`, [catId]);
+        run(`UPDATE categories SET server_count = server_count + 1 WHERE id = ?`, [catId]);
 
         // Add tags
         const addedTags = new Set();
         if (s.tags) {
             for (const t of s.tags) {
                 if (!addedTags.has(t) && tagMap[t]) {
-                    db.run(`INSERT OR IGNORE INTO server_tags (server_id, tag_id) VALUES (?, ?)`, [serverId, tagMap[t]]);
+                    run(`INSERT OR IGNORE INTO server_tags (server_id, tag_id) VALUES (?, ?)`, [serverId, tagMap[t]]);
                     addedTags.add(t);
                 }
             }
@@ -171,7 +174,7 @@ async function seed() {
         if (s.tools) {
             for (const tool of s.tools) {
                 const toolSchema = tool.input_schema ? (typeof tool.input_schema === 'string' ? tool.input_schema : JSON.stringify(tool.input_schema)) : JSON.stringify(tool.schema || {});
-                db.run(`INSERT INTO tools (id, server_id, name, description, input_schema, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+                run(`INSERT INTO tools (id, server_id, name, description, input_schema, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
                     [uuidv4(), serverId, tool.name, tool.description || tool.desc || '', toolSchema, now]);
             }
         }
@@ -179,18 +182,18 @@ async function seed() {
         // Add resources
         if (s.resources) {
             for (const r of s.resources) {
-                db.run(`INSERT INTO resources (id, server_id, name, description, uri_template, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+                run(`INSERT INTO resources (id, server_id, name, description, uri_template, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
                     [uuidv4(), serverId, r.name, r.description || r.desc || '', r.uri_template || r.uri || '', now]);
             }
         }
 
         // Add version
-        db.run(`INSERT INTO server_versions (id, server_id, version, changelog, created_at) VALUES (?, ?, ?, ?, ?)`,
+        run(`INSERT INTO server_versions (id, server_id, version, changelog, created_at) VALUES (?, ?, ?, ?, ?)`,
             [uuidv4(), serverId, '1.0.0', 'Initial release', now]);
 
         // Add a second version for some servers
         if (s.stars > 500) {
-            db.run(`INSERT INTO server_versions (id, server_id, version, changelog, created_at) VALUES (?, ?, ?, ?, ?)`,
+            run(`INSERT INTO server_versions (id, server_id, version, changelog, created_at) VALUES (?, ?, ?, ?, ?)`,
                 [uuidv4(), serverId, '1.1.0', 'Bug fixes and performance improvements', now]);
         }
 
@@ -199,10 +202,10 @@ async function seed() {
 
     console.log(`✓ Created ${serverCount} servers with tools, tags, and versions`);
 
-    // Save database
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+    db.exec('COMMIT');
+    // Seeded security persona reviews flagged submissions (role column, spec §9.1).
+    db.prepare(`UPDATE users SET role = 'admin' WHERE username = 'dave_sec'`).run();
+    db.close();
 
     console.log(`\n✅ Database seeded successfully at ${dbPath}`);
     console.log(`   Total: ${serverCount} servers, ${users.length} users, ${categoriesData.length} categories, ${tagsData.length} tags, ${clientsData.length} clients`);

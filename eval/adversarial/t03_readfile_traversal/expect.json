@@ -1,0 +1,5 @@
+{
+ "expect": "DETECT",
+ "threat": "path_traversal",
+ "group": "code"
+}

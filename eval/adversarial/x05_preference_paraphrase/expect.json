@@ -1,0 +1,6 @@
+{
+ "expect": "DETECT",
+ "threat": "preference_manipulation",
+ "group": "text",
+ "known_gap": "Model A (Talha): paraphrased preference manipulation"
+}
