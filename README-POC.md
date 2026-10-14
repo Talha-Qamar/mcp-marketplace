@@ -40,6 +40,26 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 7. **`/verifier`** → External Marketplace mode: scan a real public repo (the official fetch server).
    The candidate is never onboarded.
 
+### Live GitHub testbed (demo mode)
+
+[`Talha-Qamar/mcp-secure-testbed`](https://github.com/Talha-Qamar/mcp-secure-testbed) is a public repo of
+intentionally vulnerable MCP servers, **one branch per case**: every code threat class (command injection
+in Python and TypeScript, code injection, path traversal, SSRF, SQL injection, unsafe deserialization,
+a hidden backdoor), hiding tricks (committed `dist/`, code under `examples/`, runtime descriptions),
+tool poisoning, rug pulls and clean controls. It is built from `demo_servers/` and `eval/adversarial/`.
+Every scan of it goes through real git ingestion (`git ls-remote` → pinned commit → shallow fetch).
+
+- **`/publish`** and **`/verifier`** (Individual Verify) have a **Live GitHub testbed** picker: the testbed
+  branches plus real MCP servers pinned to releases with a published advisory.
+- **Live rug pull:** publish the `watcher-demo` case (PASS, listed), then run
+  `node scripts/testbed.js rugpull` (pushes a malicious commit to that branch) and press **Poll Now** on
+  `/watcher`. The watcher finds the new commit, re-scans it through the gate, and the listing is
+  suspended. `node scripts/testbed.js reset` restores the clean version.
+- `E2E_LIVE_TESTBED=1 npx playwright test tests/e2e/live_testbed.spec.js` runs both flows automatically.
+
+`DEMO_MODE` (on unless `NODE_ENV=production`; set `DEMO_MODE=1` or `0` to force) controls the demo-only
+features: bundled `demo:<name>` sources, the simulated watcher buttons, and the testbed picker.
+
 ---
 
 ## What Is Real vs. Simulated
@@ -53,16 +73,17 @@ The server automatically seeds the three demo servers and pre-runs their scans o
 | Merkle inclusion proofs | **REAL** | Sibling path, verified in browser |
 | Transparency log (append-only) | **REAL** | SQL table, monotonic index |
 | Signed Tree Head | **REAL** | Ed25519 over `{rootHash, size, timestamp}` |
-| AST Taint Analyzer | **REAL** | Python `ast` taint engine (`ast_taint_analyzer/`, Part 2) served over the analyzer contract (`service.py`, :8701). Analyses the tool handlers that ingestion discovered |
+| AST Taint Analyzer | **REAL** | Python `ast` taint engine (`ast_taint_analyzer/`, Part 2) served over the analyzer contract (`service.py`, :8701). Analyses the tool handlers that ingestion discovered. Sinks: shell, exec, file, deserialization, and (Mid 1 review) SSRF, SQL built from input, constant `getattr` |
+| TS/JS Taint Analyzer | **REAL** | Built-in (`src/mcpsecure/analyzers/builtin/ts_taint.js`): TypeScript compiler, follows tool input across functions and files into `child_process`, `eval`/`vm`, `fs`, `fetch`/`axios`, SQL. Its findings need Model B to agree before a FAIL |
 | Model A (text, tool poisoning / preference manipulation) | **HEURISTIC STAND-IN** | Built-in regex analyzer behind the same contract, labelled in the UI. Replaced by setting `MODEL_A_URL` once the trained model is served |
-| Model B (code vulnerabilities) | **REAL** | Trained Model B v8.2 (UniXcoder + LoRA, 6 classes) served over the contract (`model_b_service/serve.py`, :8765). FAIL only with AST corroboration (ruleset `model_b_requires_corroboration`). If it is not running the slot reports so and nothing can PASS |
-| Policy Engine | **REAL** | Pure deterministic function (policy-v4): rule types in `src/mcpsecure/policy/engine.js`, rule instances in `ruleset.json`. No PASS without coverage |
+| Model B (code vulnerabilities) | **REAL** | Trained Model B v8.2 (UniXcoder + LoRA, 6 classes) served over the contract (`model_b_service/serve.py`, :8765). FAIL when a taint analyzer (Python AST or TS/JS) proves the same flow, or a finding scoring ≥ 0.85 inside a tool handler (SQL injection still needs a proven flow). If it is not running the slot reports so and nothing can PASS |
+| Policy Engine | **REAL** | Pure deterministic function (policy-v7): rule types in `src/mcpsecure/policy/engine.js`, rule instances in `ruleset.json`. No PASS without coverage |
 | Submission gate | **REAL** | `/api/v1/submissions`: hidden listing → scan → approved / in review / rejected; admin decisions stored with a note |
 | Ingestion | **REAL** | Git repos cloned at a pinned commit (real SHA), uploads, or the bundled demo servers. One file filter; static tool discovery for Python (decorators, low-level `Tool(...)`) and TypeScript (`server.tool`, `registerTool`, low-level handlers). Nothing is executed |
 | Scan pipeline stage timings | **REAL** | Streamed over SSE from the backend as each stage completes; durations are measured, never scripted. Timings are deliberately excluded from the ScanRecord so the signed artifact stays byte-identical across runs |
 | Model C (verification agent) | **NOT BUILT YET** | Registry slot ready (`MODEL_C_URL`). Advisory only, runs on REVIEW; the admin decides |
 | Blockchain anchoring | **SIMULATED** | In-process mock → future: Ethereum Sepolia via ethers.js. Every field is *derived* (block advance and tx hash come from the Merkle root), never random, so the mock preserves the project's determinism property. A real Sepolia tx would not be reproducible this way — block number and tx hash come from the network |
-| Watcher | **PARTLY REAL** | Fingerprints are real and cover code, so a code swap is detected and a docs-only change is not. Polling a remote repo for new commits (`git ls-remote`) is not built yet; updates are triggered from the demo buttons |
+| Watcher | **REAL (on demand)** | **Poll Now** runs `git ls-remote` on every listed git server; a new commit is re-scanned through the gate (D5: listing pinned while scanned, suspended on FAIL). Fingerprints cover code, so a docs-only change is not a re-scan. Scheduled background polling is Final 1; the simulated buttons remain for the bundled demo servers (`DEMO_MODE`) |
 
 ---
 

@@ -648,3 +648,137 @@ Full results are in `spec/TEST_REPORT.md`. These changes came out of testing:
 | security review | any https host accepted as a git source (SSRF); refs starting with `-` reached git | host allowlist, ref validation, `--` |
 | failure-mode tests | analyzer responses were trusted unvalidated | responses validated against the contract schema; invalid → `error` |
 | unit test | a Python import regex swallowed the next import line | names span lines only inside parentheses |
+
+---
+
+## Appendix D: Mid 1 review (2026-10-14)
+
+**Problem.** Under policy-v5 almost every scan ended in REVIEW. Only two paths could FAIL: an AST `high`
+finding, or a Model B fail-level finding corroborated by an AST medium/high finding of the same threat in
+the same function. The AST analyzer cannot provide either for most real code:
+
+- it parses **Python only**, so TypeScript/JavaScript servers (33 of 59 known-vulnerable releases in run2)
+  could never FAIL;
+- it has **no SSRF or SQL injection sinks**, so those classes could never FAIL;
+- it is **intra-procedural**, so a tool that passes input to a helper is missed.
+
+Meanwhile Model B flags 9.3% of ordinary functions at fail level, and each uncorroborated flag was capped
+to 0.55 (REVIEW). Result in run2: 4/59 vulnerable releases rejected, the verdict unchanged by the security
+fix in 46/47 pairs, and 65% of popular benign servers in REVIEW. The Model B card already stated it:
+"JS/TS servers and ssrf/sqli findings therefore reach REVIEW at most."
+
+**Policy-v6** (`ruleset.json`, rule types in `policy/engine.js`): `model_b_requires_corroboration` gains
+`trusted_locations: ["tool_handler"]`, `trusted_min_score: 0.85` and `trusted_exclude_threats: ["sql_injection"]`.
+A Model B finding inside a discovered tool handler with a raw score of at least 0.85 keeps its score
+without AST corroboration, because tool arguments are attacker input by definition. SQL injection is
+excluded: database MCP servers (mongodb, redis, logfire) run queries in their handlers by design and scored
+0.87–0.97 there, so it still needs AST corroboration (E2).
+
+**Measured on `run3gpu`** (Kaggle T4, 148 scans, 0 errors; `eval/results/run3gpu-redecided.md`, variants
+from `node eval/replay.js run3gpu`):
+
+| Ruleset | Vulnerable FAIL | Vulnerable not PASS | Benign FAIL | Benign REVIEW |
+|---|---|---|---|---|
+| v5 | 12/66 (18%) | 62/66 | 0/23 | 15/23 |
+| v6: handler ≥ 0.75, all threats | 25/66 | 62/66 | 4/23 | 11/23 |
+| v6: handler ≥ 0.85, all threats | 21/66 | 62/66 | 3/23 (all sql_injection) | 12/23 |
+| **v6: handler ≥ 0.85, without sql_injection (adopted)** | **21/66 (32%)** | **62/66** | **0/23** | **15/23** |
+
+Benign REVIEW load (65%) is unchanged: v6 makes FAIL reachable for vulnerable code but does not reduce the
+review queue. That needs AST coverage (Appendix E) or a better Model B.
+
+**Implemented but off.** `cap_outside_reachable` (findings in code no tool reaches → evidence) gave no
+benign REVIEW reduction on run3gpu and wrongly hid a real SSRF (`mcp-searxng` `src/search.ts`). The cause:
+low-level SDK servers declare their tools in a definitions file (`src/types.ts`) that the server imports,
+so anchoring on tool files and following imports only forward misses the server. Fix before re-enabling:
+anchor on the connected component of the import graph that contains the tool files and the package
+entrypoints. `handler_callee` (trust a function a handler calls directly) added FAILs but also benign
+FAILs (`mcp-servers/filesystem`), so it is off too.
+
+**Measuring rule changes.** Each line of `eval/run_eval.js` output now carries a `replay` record (analyzer
+results and the bundle minus file contents), so `node eval/replay.js <run>` re-decides a whole run under
+several rulesets in seconds. Fix diffs are cached in `eval/fix_lines.json` so runs without a GitHub login
+(Kaggle) keep the localization metric.
+
+**Demo mode and the watcher.**
+
+- `DEMO_MODE` (on unless `NODE_ENV=production`) gates `demo:<name>` sources and the simulated watcher
+  buttons (fix 17). `GET /api/mcs/config` tells the UI.
+- `POST /api/mcs/watcher/poll`: `git ls-remote` per listed git server; a new commit becomes a gate
+  submission (D5). Every scan now records the commit it scanned in the watcher row. Before, only PASS
+  scans did, so a rejected commit would have been re-queued on every poll.
+- The open scan endpoints (`/scan-preview`, `/verify-external`) are rate-limited per IP
+  (`MCS_SCAN_RATE_LIMIT`, default 30/hour).
+- Testbed: `Talha-Qamar/mcp-secure-testbed`, one branch per case (see README-POC). Live scans of all
+  32 cases: 17/32 correct under v5, 25/32 under v6. The remaining seven: the AST `getattr` gap,
+  `sqli-fstring-py` (REVIEW, because SQL injection needs AST corroboration until E2), and five text
+  cases waiting for the trained Model A.
+
+---
+
+## Appendix E: AST analyzer expansion (Final 1, Mustafa)
+
+Goal: make AST corroboration possible where policy-v6 still relies on Model B alone, then tighten
+`trusted_min_score` (or drop tool-handler trust) once AST covers a class.
+
+| # | Work | Unblocks | Acceptance |
+|---|---|---|---|
+| E1 | **TS/JS taint** with the TypeScript compiler API already used by `ingest/discover/typescript.js`. Sources: handler parameters / destructured `args` of discovered tools. Sinks: `child_process.exec/execSync`, `spawn(…, {shell: true})`, `eval`, `new Function`, `vm.runIn*`, `fs.*` path arguments, `fetch`/`axios`/`http.request` URLs, `query`/`raw` with template strings. Sanitizers: `execFile` with an argv array, `path.resolve` + `startsWith(root)` guard, parameterised queries. | TS/JS servers can FAIL with corroboration | testbed `cmd-injection-exec-ts`, `path-traversal-ts` get AST high; `benign-execfile-ts`, `benign-ts` stay clean |
+| E2 | **Python sinks for SSRF and SQL injection**: `requests`/`httpx`/`urllib`/`aiohttp` URL arguments; `cursor.execute`/`executemany`/`text()` with f-strings, `%` or `+`; plus `yaml.load` without SafeLoader, `marshal.loads`. | ssrf/sqli corroboration | `ssrf-py`, `sqli-fstring-py` get AST high |
+| E3 | **Inter-procedural summaries** (1–2 hops, same file and imported modules): a function summary "parameter i reaches sink category X" applied at call sites. Report the finding at the sink, with the tool handler in `details`. | helper indirection | `cmd-injection-helper-py` gets AST high in the helper |
+| E4 | **Constant `getattr` resolution**: `getattr(module, "system")` with a literal name resolves to the sink. | obfuscated sinks | `cmd-injection-getattr-py` FAILs |
+| E5 | **Re-tune**: rerun the evaluation (`eval/run_eval.js` on Kaggle), replay with `trusted_min_score` raised or tool-handler trust limited to classes AST does not cover. | fewer Model-B-only FAILs | benign FAIL rate not above the v6 baseline |
+
+The contract does not change: new findings use the existing threats and severities, so the policy and
+UI need no change beyond the ruleset.
+
+---
+
+## Appendix F: Mid 1 review, part 2: taint coverage for TS/JS, SSRF and SQL (policy-v7, 2026-10-15)
+
+Scope for this iteration: Model B and the taint analyzers only (Model A work is out of scope).
+
+**Why.** Under v6, 24 of the vulnerable releases still in REVIEW were TypeScript servers where Model B
+flagged a helper function (≥ 0.85) and nothing could prove tool input reached it: the Python AST
+analyzer does not read TS/JS.
+
+**What changed.**
+
+| Component | Change |
+|---|---|
+| `ts_taint` (new, built-in: `src/mcpsecure/analyzers/builtin/ts_taint.js`) | TS/JS taint analysis with the TypeScript compiler. Sources: tool handler parameters and `CallToolRequestSchema` dispatchers. Follows calls into the server's own functions across files (same file, relative imports, unique names; never `obj.method()` into another file), up to 4 deep. Sinks: `child_process` exec / shell spawn, `eval`/`Function`/`vm`, `fs.*`, `fetch`/`axios`/`got`/`http` (URL must *start* with tool input), SQL methods (SQL must be *built* from tool input). Sanitizers and guards (`validateServerUrl(url)`, `if (!isPathAllowed(p))`) make a flow low. `.map(() => '?')` placeholder lists are clean. 20 s budget → status `partial`. |
+| `ast_taint` (Python) | New sinks: `requests`/`httpx`/`urllib`/`aiohttp` (URL must start with tool input) → `ssrf`; `.execute`/`.executemany`/`.executescript`/`.raw`/`sqlalchemy.text` with SQL built from tool input (f-string, `+`, `%`, `.format`; placeholder joins excluded) → `sql_injection`; `getattr(module, "<constant>")` resolved to the real sink (E2, E4 done). |
+| Policy-v7 | `model_b_requires_corroboration` accepts either taint analyzer (`corroborating_slots`). New `ts_taint_requires_model_b`: a `ts_taint` flow can FAIL only when Model B flags the same threat in an overlapping function; alone it is REVIEW (high) or evidence. |
+
+**Measured** (Kaggle T4, `eval/results/run7gpu.md`; v5/v6 rows re-decided from `run3gpu`):
+
+| | v5 | v6 | **v7** |
+|---|---|---|---|
+| Vulnerable releases FAIL | 12/66 (18%) | 21/66 (32%) | **25/66 (38%)** |
+| … TS/JS | 0/37 | 7/37 | **11/37** |
+| Vulnerable not PASS | 62/66 | 62/66 | 62/66 |
+| Patched releases FAIL | 11/55 | 14/55 | 16/55 |
+| Benign FAIL / REVIEW / PASS | 0 / 15 / 8 | 0 / 15 / 8 | **0 / 15 / 8** |
+| Testbed code cases correct (27) | 17 | 23 | **27** |
+
+False positives found and fixed on the way (each measured on a full run): placeholder lists for
+parameterised SQL (`n8n-mcp`, `mcp-memory-keeper`), validator guards (`ckan-mcp-server`), and method
+calls linked to an unrelated same-named function (`apify-mcp-server`).
+
+**Still open.**
+- Benign REVIEW load is unchanged (15/23): the remaining reviews come from uncorroborated Model B scores
+  in reachable code and coverage rules. Lowering it needs a better Model B, not stricter rules.
+- Patched releases: 16/55 still FAIL. Some are genuine (a fix often closes one flow and leaves
+  another; e.g. `mcp-package-docs` still fetches a URL built from tool input), some are
+  approximations of the analyzers. Each needs a human look before it counts as a false positive.
+- `ts_taint` call resolution is name-based (no type checker). Inter-procedural Python (E3) is not done.
+
+**Model B (assessed, not retrained before Mid 1).** The data points to three improvements, each a full
+train → validate → re-release (hash pin) → re-evaluate cycle (~3 h training on a T4 plus review):
+1. *Fixed-twin sensitivity*: the localized finding disappears in the fixed release in only 7/41
+   cases. More real vulnerable/fixed pairs per class (GHSA fix commits, not the evaluation corpus)
+   should teach the model what the fix changes.
+2. *Ordinary file handling*: path traversal is the weakest class (PR-AUC 0.69) and the main source of
+   benign REVIEW. Add reviewed safe file-handling functions from real MCP servers as negatives.
+3. *Per-class thresholds on MCP code*: recalibrate review/fail per class on MCP-only out-of-fold scores.
+Swapping the model on the night before a demo was judged too risky: v8.2 stays pinned.
