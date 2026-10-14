@@ -342,19 +342,21 @@ const App = {
       }
     }, 100);
 
-    const path = window.location.pathname;
-    if (path === '/' || path.endsWith('index.html'))         this.initHomePage();
-    else if (path.endsWith('servers.html'))                  this.initServersPage();
-    else if (path.endsWith('server-detail.html'))            this.initServerDetailPage();
-    else if (path.endsWith('publish.html'))  {
+    // The server serves every page at both /name and /name.html, so match on
+    // the page name, not the .html suffix (clean URLs left forms unwired).
+    const page = (window.location.pathname.replace(/\/+$/, '').split('/').pop() || 'index').replace(/\.html$/, '');
+    if (page === 'index')                                    this.initHomePage();
+    else if (page === 'servers')                             this.initServersPage();
+    else if (page === 'server-detail')                       this.initServerDetailPage();
+    else if (page === 'publish')  {
       if (!this.currentUser) { window.location.href = '/login.html'; return; }
       this.initPublishPage();
     }
-    else if (path.endsWith('clients.html'))                  this.initClientsPage();
-    else if (path.endsWith('categories.html'))               this.initCategoriesPage();
-    else if (path.endsWith('login.html'))                    this.initLoginPage();
-    else if (path.endsWith('register.html'))                 this.initRegisterPage();
-    else if (path.endsWith('profile.html')) {
+    else if (page === 'clients')                             this.initClientsPage();
+    else if (page === 'categories')                          this.initCategoriesPage();
+    else if (page === 'login')                               this.initLoginPage();
+    else if (page === 'register')                            this.initRegisterPage();
+    else if (page === 'profile') {
       if (!this.currentUser) { window.location.href = '/login.html'; return; }
       this.initProfilePage();
     }

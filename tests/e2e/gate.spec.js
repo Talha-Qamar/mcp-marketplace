@@ -86,3 +86,14 @@ test('a publisher cannot read or decide on someone else\'s submission', async ({
   expect((await page.request.get(`/api/v1/submissions/${submission.id}`)).status()).toBe(404);
   expect((await page.request.post(`/api/v1/submissions/${submission.id}/decision`, { data: { decision: 'approve', note: 'x' } })).status()).toBe(403);
 });
+
+test('the login form works at the clean URL /login (not only /login.html)', async ({ page }) => {
+  for (const url of ['/login', '/login.html']) {
+    await page.context().clearCookies();
+    await page.goto(url);
+    await page.fill('#email', 'alice_dev@example.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-form button[type=submit]');
+    await expect.poll(async () => (await page.request.get('/api/auth/me')).status(), { timeout: 10_000 }).toBe(200);
+  }
+});
