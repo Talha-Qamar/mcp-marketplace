@@ -25,6 +25,7 @@ async function servicesUp() {
 
 test('demo verdicts (with and without bait-and-switch)', { timeout: 300000 }, async (t) => {
   if (!(await servicesUp())) {
+    stopLocalAnalyzers(); // the AST service may have started; a live child keeps the test process from exiting
     t.skip('analyzer services not available (see model_b_service/README.md)');
     return;
   }

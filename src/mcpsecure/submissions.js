@@ -24,9 +24,13 @@ const service = require('./service');
 const store = require('./store');
 const listing = require('./listing');
 const { waitForRequiredAnalyzers } = require('./orchestrator/local_services');
+const { parseRepoUrl, resolveCommit } = require('./ingest/sources');
 
 const STATE_FOR_VERDICT = { PASS: 'approved', REVIEW: 'in_review', FAIL: 'rejected' };
 const DEMO_SOURCES = new Set(['weather-tools', 'db-helper', 'shell-runner']);
+// Demo-only features (bundled demo sources, simulated watcher updates). Off in
+// production unless DEMO_MODE=1 is set explicitly.
+const DEMO_MODE = process.env.DEMO_MODE ? process.env.DEMO_MODE === '1' : process.env.NODE_ENV !== 'production';
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 
 const bus = new EventEmitter();
@@ -93,6 +97,7 @@ function normaliseSource(input) {
     return { kind: 'files', files: src.files.map(f => ({ path: String(f.path || ''), content: String(f.content || '') })) };
   }
   if (src.kind === 'demo') {
+    if (!DEMO_MODE) throw badRequest('demo sources are disabled (DEMO_MODE is off)');
     if (!DEMO_SOURCES.has(src.name)) throw badRequest(`unknown demo server '${src.name}'`);
     return { kind: 'local', path: `demo_servers/${src.name}`, demo: src.name };
   }
@@ -291,6 +296,46 @@ function decide(id, reviewer, decision, note) {
   return getSubmission(id);
 }
 
+/**
+ * The watcher (spec §9.1 "Updates"): for every listed git server, resolve its
+ * watched ref with `git ls-remote`. A new commit becomes a new submission
+ * version, scanned through the same gate; the listing follows decision D5
+ * (stays pinned while the update is scanned or reviewed, suspended on FAIL).
+ */
+async function pollWatched() {
+  const out = [];
+  for (const row of store.getWatcherRows()) {
+    const server = oneRow(`SELECT * FROM servers WHERE id = ?`, [row.serverId]);
+    const source = server && server.source_json ? JSON.parse(server.source_json) : null;
+    if (!source || source.kind !== 'git') continue;
+    const item = { serverId: server.id, slug: server.slug, name: server.name, lastSeenSha: row.lastSeenSha };
+    try {
+      const { cloneUrl, ref } = parseRepoUrl(source.repo_url, source.ref);
+      item.sha = await resolveCommit(cloneUrl, ref);
+    } catch (e) {
+      out.push({ ...item, status: 'error', error: e.message });
+      continue;
+    }
+    const pending = oneRow(`SELECT id FROM submissions WHERE server_id = ? AND state IN ('queued', 'ingesting', 'scanning')`, [server.id]);
+    if (item.sha === row.lastSeenSha || pending) {
+      out.push({ ...item, status: pending ? 'scan_pending' : 'up_to_date' });
+      continue;
+    }
+    const stale = allRows(`SELECT id FROM submissions WHERE server_id = ? AND state = 'in_review'`, [server.id]);
+    for (const old of stale) setState(old.id, 'superseded');
+    const last = oneRow(`SELECT declared_tools_json FROM submissions WHERE server_id = ? ORDER BY created_at DESC LIMIT 1`, [server.id]);
+    const id = uuidv4();
+    const ts = now();
+    runSql(`INSERT INTO submissions (id, server_id, submitter_id, source_json, declared_tools_json, state, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
+      [id, server.id, server.author_id, JSON.stringify(source), last ? last.declared_tools_json : '[]', ts, ts]);
+    emit(id, 'state', { state: 'queued' });
+    out.push({ ...item, status: 'new_commit', submissionId: id });
+  }
+  if (out.some(o => o.status === 'new_commit')) setImmediate(kick);
+  return out;
+}
+
 function decisionsFor(id) {
   return allRows(`SELECT d.*, u.username AS reviewer FROM review_decisions d JOIN users u ON u.id = d.reviewer_id
                   WHERE d.submission_id = ? ORDER BY d.created_at`, [id]);
@@ -298,5 +343,5 @@ function decisionsFor(id) {
 
 module.exports = {
   createSubmission, getSubmission, listForUser, reviewQueue, decide, decisionsFor,
-  subscribe, startWorker, kick, normaliseSource,
+  subscribe, startWorker, kick, normaliseSource, pollWatched, DEMO_MODE,
 };

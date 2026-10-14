@@ -141,6 +141,8 @@ const MCSAPI = (() => {
     getAnchors: () => get('/anchors'),
     triggerAnchor: () => post('/anchors/trigger', {}),
     getWatcher: () => get('/watcher'),
+    pollWatcher: () => post('/watcher/poll', {}),
+    getConfig: () => get('/config'),
     simulateUpdate: (serverId, updateType) => post(`/watcher/${serverId}/simulate-update`, { updateType }),
     verifyExternal: (body) => post('/verify-external', body),
     getPubkey: () => get('/pubkey'),
@@ -1134,6 +1136,7 @@ const MCSWatcher = (() => {
 
   async function render(container) {
     const rows = await MCSAPI.getWatcher().catch(() => []);
+    const demoMode = (await MCSAPI.getConfig().catch(() => ({ demoMode: false }))).demoMode;
 
     const statusBadge = (s) => {
       const map = {
@@ -1156,7 +1159,7 @@ const MCSWatcher = (() => {
           <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-2);font-size:0.875rem;">
             <input type="checkbox" id="autopoll-toggle"> Auto-poll (30s)
           </label>
-          <button class="btn btn-outline btn-sm" onclick="MCSWatcher.pollNow()">⟳ Poll Now</button>
+          <button class="btn btn-outline btn-sm" onclick="MCSWatcher.pollNow(this)" title="git ls-remote on every watched repository; a new commit is re-scanned through the gate">⟳ Poll Now</button>
         </div>
       </div>
 
@@ -1185,7 +1188,7 @@ const MCSWatcher = (() => {
                 <td>${statusBadge(row.status)}</td>
                 <td style="font-size:0.8rem;color:var(--text-3)">${row.lastCheckedAt ? new Date(row.lastCheckedAt).toLocaleString() : '—'}</td>
                 <td>
-                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;${demoMode ? '' : 'display:none;'}">
                     <button class="btn btn-outline btn-xs" onclick="MCSWatcher.simulateUpdate('${row.serverId}', 'docs_only')" title="Only README changed — fingerprint unchanged, verdict carried forward">📄 Docs Only</button>
                     <button class="btn btn-xs" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;" onclick="MCSWatcher.simulateUpdate('${row.serverId}', 'bait_and_switch')" title="Malicious code injected — triggers automatic re-scan">☠ Bait &amp; Switch</button>
                   </div>
@@ -1288,11 +1291,24 @@ const MCSWatcher = (() => {
     `;
   }
 
-  async function pollNow() {
-    const btn = event?.target;
+  // Real poll: the server runs git ls-remote on each watched git repository
+  // and queues a gate re-scan for every new commit.
+  async function pollNow(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Polling…'; }
+    let summary = '';
+    try {
+      const { polled } = await MCSAPI.pollWatcher();
+      const label = { new_commit: 'new commit → re-scan queued', up_to_date: 'up to date', scan_pending: 'scan in progress', error: 'error' };
+      summary = polled.length === 0
+        ? '<p style="margin:0">No git-sourced servers are being watched yet. Publish one (e.g. a testbed branch) first.</p>'
+        : `<ul style="margin:0;padding-left:1.2rem">${polled.map(p => `<li><strong>${escapeHtml(p.name)}</strong>: ${escapeHtml(label[p.status] || p.status)}${p.sha ? ` <code>${escapeHtml(p.sha.slice(0, 12))}</code>` : ''}${p.error ? ` (${escapeHtml(p.error)})` : ''}${p.submissionId ? ` · <a href="/server-detail?slug=${encodeURIComponent(p.slug)}">listing</a> (press Poll Now again when the scan has finished)` : ''}</li>`).join('')}</ul>`;
+    } catch (e) {
+      summary = `<p style="margin:0;color:var(--error)">Poll failed: ${escapeHtml(e.message)}</p>`;
+    }
     await render(document.querySelector('.mcs-watcher-root') || document.querySelector('main'));
-    if (btn) { btn.disabled = false; btn.textContent = '⟳ Poll Now'; }
+    const el = document.getElementById('watcher-update-result');
+    if (el) el.innerHTML = `<div class="card mcs-update-result-card"><h3 style="margin-top:0">Poll result · ${new Date().toLocaleTimeString()}</h3>${summary}</div>`;
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = '⟳ Poll Now'; }
   }
 
   return { render, simulateUpdate, loadVersionHistory, pollNow };

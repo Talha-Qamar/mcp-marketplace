@@ -68,6 +68,10 @@
                         🌐 Real GitHub repo
                     </button>
                 </div>
+                <div id="testbed-wrap" style="display:none;margin-top:0.75rem;">
+                    <label class="label" for="testbed-select" style="font-size:0.8rem;">🧪 Live GitHub testbed: one branch per threat, plus real advisory releases</label>
+                    <select class="select" id="testbed-select" style="max-width:100%;"></select>
+                </div>
                 <p style="margin:0.75rem 0 0;color:var(--text-3);font-size:0.8rem;">
                     The first three submit the bundled demo servers (<code>demo_servers/</code>); the last clones a real public MCP server. Or enter any public GitHub repository URL.
                     The code is cloned at a pinned commit and analysed statically — it is never run. The listing stays hidden until the verdict allows it.
@@ -233,6 +237,7 @@
     <script src="/js/components.js"></script>
     <script src="/js/app.js"></script>
     <script src="/js/mcpsecure.js"></script>
+    <script src="/js/testbed.js"></script>
     <script>
     /* ============================================================
        Publish Page — MCP Secure End-to-End Flow
@@ -310,6 +315,19 @@
             setTimeout(() => s.style.background = '', 600);
         });
     }
+
+    // Live testbed picker: fills the form with a public git URL (no declared
+    // tools, so the declared-vs-discovered check stays quiet).
+    MCSTestbed.mount(document.getElementById('testbed-select'), document.getElementById('testbed-wrap'), e => {
+        document.getElementById('server-name').value = e.name;
+        const urlInput = document.getElementById('github-url');
+        urlInput.value = e.url;
+        urlInput.dataset.demo = '';
+        document.getElementById('description').value = e.description.slice(0, 140);
+        document.getElementById('long-description').value = e.longDescription;
+        document.getElementById('desc-hint').textContent = Math.min(e.description.length, 140) + ' / 140';
+        document.getElementById('tools-container').innerHTML = '';
+    });
 
     function addToolRow(name = '', desc = '') {
         const container = document.getElementById('tools-container');

@@ -13,7 +13,32 @@ const router = express.Router();
 const service = require('../mcpsecure/service');
 const store = require('../mcpsecure/store');
 const listing = require('../mcpsecure/listing');
-const { normaliseSource } = require('../mcpsecure/submissions');
+const { normaliseSource, pollWatched, DEMO_MODE } = require('../mcpsecure/submissions');
+const { requireAdmin } = require('../middleware/auth');
+
+const TESTBED_REPO = process.env.MCS_TESTBED_REPO || 'https://github.com/Talha-Qamar/mcp-secure-testbed';
+
+/**
+ * Per-IP limit for the open scan endpoints (scan-preview, verify-external):
+ * each request clones and scans a repository. MCS_SCAN_RATE_LIMIT per hour.
+ */
+const SCAN_LIMIT = Number(process.env.MCS_SCAN_RATE_LIMIT || 30);
+const scanHits = new Map();
+function scanRateLimit(req, res, next) {
+  const key = req.ip;
+  const hour = Date.now() - 3600000;
+  const hits = (scanHits.get(key) || []).filter(t => t > hour);
+  if (hits.length >= SCAN_LIMIT) return res.status(429).json({ error: `rate limit: at most ${SCAN_LIMIT} scans per hour` });
+  hits.push(Date.now());
+  scanHits.set(key, hits);
+  next();
+}
+
+/** Demo-only routes answer 404 when DEMO_MODE is off. */
+function demoOnly(req, res, next) {
+  if (!DEMO_MODE) return res.status(404).json({ error: 'demo features are disabled (DEMO_MODE is off)' });
+  next();
+}
 const { ingest } = require('../mcpsecure/ingest');
 const { REPO_ROOT } = require('../mcpsecure/ingest/sources');
 const { getServerBySlug, oneRow } = require('../db');
@@ -21,6 +46,11 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+// ─── Client config (demo mode, testbed) ───────────────────────────────────────
+router.get('/config', (req, res) => {
+  res.json({ demoMode: DEMO_MODE, testbedRepo: TESTBED_REPO });
+});
 
 // ─── Public key endpoint (needed by client-side verify) ────────────────────────
 router.get('/pubkey', (req, res) => {
@@ -275,7 +305,20 @@ router.get('/watcher', (req, res) => {
 // leaves the content fingerprint (which covers code, tools and listing text,
 // not the README) unchanged and needs no re-scan; a code swap changes it and
 // triggers one.
-router.post('/watcher/:serverId/simulate-update', async (req, res) => {
+// ─── Poll watched repositories (real watcher) ─────────────────────────────────
+// git ls-remote on each listed git server's watched ref; a new commit is
+// re-scanned through the submission gate. Anyone may trigger it in demo mode,
+// admins otherwise.
+router.post('/watcher/poll', (req, res, next) => (DEMO_MODE ? next() : requireAdmin(req, res, next)), async (req, res) => {
+  try {
+    res.json({ polled: await pollWatched() });
+  } catch (e) {
+    console.error('[MCS /watcher/poll]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/watcher/:serverId/simulate-update', demoOnly, async (req, res) => {
   let tmp = null;
   try {
     const { serverId } = req.params;
@@ -370,7 +413,7 @@ router.post('/watcher/:serverId/simulate-update', async (req, res) => {
 // MCP Secure scanning a repository on behalf of an external party. The
 // candidate is ingested and scanned like any submission, but NEVER added to
 // the marketplace catalog.
-router.post('/verify-external', async (req, res) => {
+router.post('/verify-external', scanRateLimit, async (req, res) => {
   try {
     const { requesterName, candidateRef, ref } = req.body;
     if (!candidateRef) return res.status(400).json({ error: 'candidateRef (a public git repository URL) is required' });
@@ -482,7 +525,7 @@ router.post('/mcp-endpoint-mock', (req, res) => {
 // ─── Scan Preview ─────────────────────────────────────────────────────────────
 // Scans a public repository without creating a listing (kept for API callers;
 // the publish page uses /api/v1/submissions).
-router.post('/scan-preview', async (req, res) => {
+router.post('/scan-preview', scanRateLimit, async (req, res) => {
   try {
     const { content } = req.body;
     if (!content || !content.github_url) {

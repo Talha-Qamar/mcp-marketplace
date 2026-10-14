@@ -76,6 +76,23 @@ function simulateAnchor() {
   return receipt;
 }
 
+// ─── Watcher row: the commit last scanned, whatever the verdict ───────────────
+// (Recording only PASS scans made the watcher re-queue a rejected commit on
+// every poll.)
+const WATCH_STATUS = { PASS: 'up_to_date', REVIEW: 'change_detected', FAIL: 'no_longer_verifiable' };
+
+function recordWatcher(request, scanRecord) {
+  store.upsertWatcherRow({
+    serverId: request.serverId,
+    watchedRef: scanRecord.subject.ref || 'main',
+    lastSeenSha: scanRecord.subject.commit_sha,
+    lastFingerprint: scanRecord.subject.content_fingerprint,
+    lastVerdict: scanRecord.verdict,
+    lastCheckedAt: new Date().toISOString(),
+    status: WATCH_STATUS[scanRecord.verdict] || 'change_detected',
+  });
+}
+
 // ─── Full pipeline: scan → attest → log → maybe anchor ───────────────────────
 
 /**
@@ -126,18 +143,7 @@ async function runFullPipeline(request, version, isExternal = false, onStage = n
       blockNumber: anchored && anchored.blockNumber,
     });
 
-    // Update watcher row (only for marketplace servers, not preview)
-    if (!isExternal) {
-      store.upsertWatcherRow({
-        serverId: request.serverId,
-        watchedRef: scanRecord.subject.ref || 'main',
-        lastSeenSha: scanRecord.subject.commit_sha,
-        lastFingerprint: scanRecord.subject.content_fingerprint,
-        lastVerdict: scanRecord.verdict,
-        lastCheckedAt: new Date().toISOString(),
-        status: 'up_to_date',
-      });
-    }
+    if (!isExternal) recordWatcher(request, scanRecord);
 
     return {
       scanRecord,
@@ -161,6 +167,7 @@ async function runFullPipeline(request, version, isExternal = false, onStage = n
 
     // Save scan record locally for audit, but NEVER push to mcs_log_leaves or blockchain
     store.saveScanRecord(scanRecord, rejectionAttestation);
+    if (!isExternal) recordWatcher(request, scanRecord);
     await stage('blocked', 'done', {
       verdict: scanRecord.verdict,
       attestationStatus: rejectionAttestation.status,
