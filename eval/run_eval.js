@@ -5,6 +5,7 @@
  * writes one JSON line per scan to eval/results/<name>.jsonl (resumable).
  *
  *   node eval/run_eval.js [--set vuln|benign|all] [--limit N] [--only <id-substring>] [--out name]
+ *   node eval/run_eval.js --prefetch-fixes      (caches fix diffs in eval/fix_lines.json)
  *
  * For a vulnerable case with a fixed twin, the lines changed by the fix
  * (GitHub compare API) are recorded so the report can check whether a finding
@@ -24,6 +25,10 @@ const SET = arg('set', 'all');
 const LIMIT = Number(arg('limit', 0));
 const ONLY = arg('only', null);
 const OUT = path.join(HERE, 'results', `${arg('out', 'latest')}.jsonl`);
+// Fix diffs fetched once with `--prefetch-fixes` (needs gh), so runs without a
+// GitHub login (e.g. on Kaggle) still record localization.
+const FIX_CACHE = path.join(HERE, 'fix_lines.json');
+const fixCache = fs.existsSync(FIX_CACHE) ? JSON.parse(fs.readFileSync(FIX_CACHE, 'utf8')) : {};
 
 function sourceFor(c, ref) {
   const url = c.subdir ? `${c.repo}/tree/${ref}/${c.subdir}` : c.repo;
@@ -32,6 +37,7 @@ function sourceFor(c, ref) {
 
 /** Old-side line ranges changed by the fix, per file path relative to the scanned root. */
 function changedLines(c) {
+  if (fixCache[c.id]) return fixCache[c.id];
   const m = c.repo.match(/github\.com\/([^/]+\/[^/]+)/);
   try {
     const out = execFileSync('gh', ['api', `repos/${m[1]}/compare/${c.vulnerable.commit}...${c.fixed.commit}`, '-q',
@@ -79,6 +85,16 @@ function summarize(out) {
       })),
     })),
     effective: out.policy.effective_findings,
+    // Everything policy.decide() reads, minus file contents: eval/replay.js
+    // re-decides stored scans under another ruleset without rescanning.
+    replay: {
+      slots: out.slots.map(s => ({ slot: s.slot, kind: s.kind, required: s.required, result: s.result })),
+      bundle: {
+        files: out.bundle.files.map(f => ({ path: f.path, language: f.language, tool_reachable: f.tool_reachable })),
+        tools: out.bundle.tools.map(t => ({ tool_id: t.tool_id, file: t.file, handler: t.handler, calls: t.calls })),
+        coverage: out.bundle.coverage,
+      },
+    },
   };
 }
 
@@ -93,6 +109,12 @@ async function scan(source) {
 }
 
 (async () => {
+  if (process.argv.includes('--prefetch-fixes')) {
+    for (const c of require('./corpus.json').cases) if (c.fixed && !fixCache[c.id]) fixCache[c.id] = changedLines(c);
+    fs.writeFileSync(FIX_CACHE, JSON.stringify(fixCache, null, 1) + '\n');
+    console.error(`wrote ${Object.keys(fixCache).length} fix diffs to ${FIX_CACHE}`);
+    return;
+  }
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   const done = new Set(fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').split('\n').filter(Boolean).map(l => { const j = JSON.parse(l); return `${j.set}:${j.id}:${j.version}`; }) : []);
   const write = rec => fs.appendFileSync(OUT, JSON.stringify(rec) + '\n');

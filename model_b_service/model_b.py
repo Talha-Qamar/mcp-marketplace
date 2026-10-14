@@ -193,6 +193,11 @@ class ModelB:
         else:                                # older run: one threshold shared by every class
             self.fail = {c: cfg["threshold_fail_raw"] for c in self.classes}
             self.review = {c: cfg["threshold_review_raw"] for c in self.classes}
+        # MODEL_B_DEVICE=cuda (opt-in, e.g. Kaggle evaluation runs): CPU stays the
+        # default; the training notebook's parity check puts CPU vs GPU at <= 1e-4.
+        self.device = os.environ.get("MODEL_B_DEVICE", "cpu")
+        if self.device.startswith("cuda"):
+            os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")  # needed for deterministic CUDA matmuls
         torch.manual_seed(0)
         torch.set_num_threads(threads or int(os.environ.get("MODEL_B_THREADS", min(8, os.cpu_count() or 1))))
         torch.use_deterministic_algorithms(True)
@@ -200,7 +205,7 @@ class ModelB:
         base = AutoModelForSequenceClassification.from_pretrained(
             cfg["config"]["model"], revision=BASE_REVISION, num_labels=len(self.classes),
             problem_type="multi_label_classification", torch_dtype=torch.float32)
-        self.model = PeftModel.from_pretrained(base, self.model_dir).merge_and_unload().eval()
+        self.model = PeftModel.from_pretrained(base, self.model_dir).merge_and_unload().eval().to(self.device)
         self.hash = model_hash(self.model_dir)
         self._cache = {}
 
@@ -250,8 +255,8 @@ class ModelB:
                 idx = by_len[L]
                 for b in range(0, len(idx), batch):
                     part = idx[b:b + batch]
-                    x = torch.tensor([wins[j] for j in part])
-                    logits = self.model(input_ids=x, attention_mask=torch.ones_like(x)).logits.double().numpy()
+                    x = torch.tensor([wins[j] for j in part], device=self.device)
+                    logits = self.model(input_ids=x, attention_mask=torch.ones_like(x)).logits.double().cpu().numpy()
                     p = 1 / (1 + np.exp(-logits))
                     for j, row in zip(part, p):
                         S[owner[j]] = np.maximum(S[owner[j]], row)
