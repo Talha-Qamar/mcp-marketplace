@@ -7,6 +7,8 @@ admin, FAIL is rejected.
 
 The design is in [spec/PIPELINE_SPEC.md](spec/PIPELINE_SPEC.md). [README-POC.md](README-POC.md)
 covers the demo flow and what is real versus simulated.
+**[MID1_REPORT.md](MID1_REPORT.md)** has the Mid 1 results: dataset, Model B training and
+scores, the taint analyzers, the policy, and the real-world evaluation.
 
 ## Setup
 
