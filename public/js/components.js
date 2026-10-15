@@ -91,6 +91,26 @@ function brandAvatar(slug, name, sizeClass = 'avatar-sm') {
 }
 
 /* ---- Language/tag color helpers ---- */
+/**
+ * Listing data is attacker-controlled (publishers write names, descriptions,
+ * tags; tool names come from scanned code). Templates build HTML strings, so
+ * every server record is escaped once, here, before any template sees it.
+ */
+function escapeHtmlText(v) {
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escapeServer(value) {
+  if (typeof value === 'string') return escapeHtmlText(value);
+  if (Array.isArray(value)) return value.map(escapeServer);
+  if (value && typeof value === 'object') {
+    if (value.__escaped) return value;
+    const out = { __escaped: true };
+    for (const [k, v] of Object.entries(value)) out[k] = escapeServer(v);
+    return out;
+  }
+  return value;
+}
+
 function tagBadge(tag) {
   const t = (tag || '').toLowerCase();
   if (t.includes('typescript') || t === 'ts') return `<span class="badge tag-typescript">${tag}</span>`;
@@ -228,6 +248,7 @@ const Components = {
 
   /* ---- Server Card ---- */
   createServerCard(server) {
+    server = escapeServer(server);
     const author = server.author_display_name || server.author_username || server.author || 'Publisher';
     const name   = server.name || 'Unnamed Server';
     const slug   = server.slug || name.toLowerCase().replace(/\s+/g,'-');
@@ -431,6 +452,7 @@ const Components = {
 
   /* ---- Install Config Block ---- */
   createInstallConfig(server) {
+    server = escapeServer(server);
     const slug    = server.slug || 'server';
     const lang    = (server.language || '').toLowerCase();
     const isPy    = lang.includes('python');
@@ -533,7 +555,8 @@ const Components = {
   },
 
   _colorizeJson(jsonStr) {
-    return jsonStr
+    // Schemas come from scanned repositories: escape before adding markup.
+    return jsonStr.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/("[\w\s\-@\/]+")\s*:/g, '<span class="tok-key">$1</span>:')
       .replace(/:\s*(".*?")/g, ': <span class="tok-string">$1</span>')
       .replace(/:\s*(\d+\.?\d*)/g, ': <span class="tok-number">$1</span>');
@@ -550,57 +573,18 @@ const Components = {
       schemaObj = { error: 'Invalid schema', raw: String(tool.input_schema || '') };
     }
 
-    const consoleId = 'console-' + (tool.id || Math.random().toString(36).slice(2, 9));
-    const sampleInput = schemaObj.properties
-      ? Object.keys(schemaObj.properties).reduce((acc, key) => {
-          const type = schemaObj.properties[key]?.type;
-          acc[key] = type === 'number' ? 42 : type === 'boolean' ? true : `example_${key}`;
-          return acc;
-        }, {})
-      : { query: 'example query' };
+    const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     return `
       <div class="tool-card-box">
         <div class="tool-header">
           <div style="display:flex;align-items:center;gap:0.75rem;">
-            <span class="tool-name">${icon('wrench',16)} ${tool.name}</span>
-            <span class="badge badge-indigo">Callable Tool</span>
+            <span class="tool-name">${icon('wrench',16)} ${esc(tool.name)}</span>
           </div>
-          <button class="btn btn-sm btn-outline" style="border-color:var(--accent);color:var(--accent);"
-            onclick="const el=document.getElementById('${consoleId}');el.style.display=el.style.display==='none'?'block':'none';return false;">
-            ${icon('zap',14)} Test Tool
-          </button>
         </div>
-        <div class="tool-desc">${tool.description || 'No description provided.'}</div>
+        <div class="tool-desc">${esc(tool.description || 'No description provided.')}</div>
         <p class="filter-title" style="margin-bottom:0.5rem;">Input Schema (JSON)</p>
         <pre class="tool-schema"><code>${this._colorizeJson(JSON.stringify(schemaObj, null, 2))}</code></pre>
-
-        <div id="${consoleId}" class="test-console-box" style="display:none;">
-          <div class="test-console-header">
-            <span>⚡ TOOL SANDBOX — ${tool.name}</span>
-            <span style="opacity:0.7;">ISOLATED</span>
-          </div>
-          <div class="test-console-body">
-            <div style="margin-bottom:0.75rem;">
-              <span class="security-pill safe">Encrypted RPC</span>
-              <span class="security-pill warn">Input Validation: Active</span>
-            </div>
-            <label class="filter-title" style="margin-bottom:0.35rem;">Execution Payload (editable)</label>
-            <textarea id="input-${consoleId}" style="width:100%;height:90px;background:#010405;color:#a5f3fc;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.5rem;font-family:var(--font-mono);font-size:0.8rem;resize:vertical;">${JSON.stringify(sampleInput, null, 2)}</textarea>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;">
-              <button class="btn btn-primary btn-sm" onclick="
-                const out=document.getElementById('output-${consoleId}');
-                out.style.display='block';
-                out.textContent='⏳ Running simulation…';
-                setTimeout(()=>{out.textContent='✅ [SUCCESS — 38ms]\\n🔒 Auth: Confirmed\\n📤 Result: { status: \\'ok\\', timestamp: '+Date.now()+', data: \\'Validation passed. No anomalies.\\' }';},650);
-                return false;">
-                ▶ Run
-              </button>
-              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('${consoleId}').style.display='none';return false;">Close</button>
-            </div>
-            <pre id="output-${consoleId}" style="display:none;margin-top:0.875rem;padding:0.75rem;background:#07191d;border-left:3px solid var(--accent);color:#6ee7b7;font-family:var(--font-mono);font-size:0.8rem;white-space:pre-wrap;border-radius:0 4px 4px 0;"></pre>
-          </div>
-        </div>
       </div>
     `;
   },

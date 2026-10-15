@@ -67,7 +67,12 @@ function transaction(fn) {
 
 // Catalog visibility (spec §9.1): only servers with an approved scan, plus the
 // seeded legacy catalog rows that predate the gate.
-const LISTED = `s.listing_status IN ('approved', 'legacy')`;
+// The seeded legacy rows have placeholder repositories and were never scanned,
+// so they are hidden unless MCS_SHOW_LEGACY=1: the catalog shows only servers
+// that went through the MCP Secure gate.
+const LISTED = process.env.MCS_SHOW_LEGACY === '1'
+    ? `s.listing_status IN ('approved', 'legacy')`
+    : `s.listing_status = 'approved'`;
 
 function getServers(filters = {}) {
     let query = `

@@ -306,6 +306,55 @@ const MOCK_STATS = {
 /* =============================================================
    APPLICATION
    ============================================================= */
+/* ---- MCP Secure status on server pages (real scan data only) ---- */
+const escText = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Header badge from the server's security status (set by the scan gate / admin review). */
+function securityBadge(server) {
+  const map = {
+    verified: ['badge-success', '✓ MCP Secure: PASS'],
+    reviewed: ['badge-success', '✓ Approved after security review'],
+    unverified: ['badge-warning', '⚠ Under security review'],
+    malicious: ['badge-error', '✕ Rejected by MCP Secure'],
+  };
+  const [cls, label] = map[server.security_status] || ['badge-default', 'Not yet scanned'];
+  return `<span class="badge ${cls}" style="font-size:0.8rem;">${label}</span>`;
+}
+
+/** Sidebar summary of the latest real MCP Secure scan of this server. */
+async function loadScanSummary(slug) {
+  const el = document.getElementById('mcs-scan-summary');
+  if (!el) return;
+  const head = el.querySelector('h3').outerHTML;
+  try {
+    const scans = await fetch(`/api/mcs/scans?serverSlug=${encodeURIComponent(slug)}`).then(r => (r.ok ? r.json() : []));
+    const s = Array.isArray(scans) && scans[0];
+    if (!s) { el.innerHTML = `${head}<div style="color:var(--text-3);font-size:0.8125rem;">No MCP Secure scan recorded for this server.</div>`; return; }
+    const color = { PASS: 'var(--accent)', REVIEW: '#f59e0b', FAIL: '#ef4444' }[s.verdict] || 'var(--text-2)';
+    const row = (k, v) => `<div class="info-property-box"><span class="prop-key">${k}</span><span class="prop-val">${v}</span></div>`;
+    const source = s.subject && s.subject.commit_sha
+      ? `<code>${escText(s.subject.commit_sha.slice(0, 12))}</code>`
+      : escText((s.subject && s.subject.source_kind) || '—');
+    const analyzers = (s.analyzers || []).filter(a => a.status !== 'not_applicable')
+      .map(a => `<div style="display:flex;justify-content:space-between;gap:0.5rem;font-size:0.8rem;"><span style="color:var(--text-3);">${escText(a.display_name || a.analyzer)}</span><span>${escText(a.status)}${typeof a.score === 'number' ? ` · ${a.score.toFixed(2)}` : ''}</span></div>`).join('');
+    const reasons = ((s.policy && s.policy.reasons) || []).filter(r => r.verdict || r.rule === 'model_b_requires_corroboration').slice(0, 3)
+      .map(r => `<li style="margin-bottom:0.35rem;">${escText(r.message)}</li>`).join('');
+    el.innerHTML = `${head}
+      <div style="font-size:1.375rem;font-weight:700;color:${color};margin-bottom:0.75rem;">${escText(s.verdict)}</div>
+      ${row('Scan', `v${escText(s.version)} · ${escText(new Date(s.createdAt).toLocaleString())}`)}
+      ${row('Policy', escText(s.policyVersion || '—'))}
+      ${row('Commit', source)}
+      <div style="margin:0.75rem 0;display:flex;flex-direction:column;gap:0.3rem;">${analyzers}</div>
+      ${reasons ? `<ul style="margin:0 0 0.75rem;padding-left:1.1rem;font-size:0.78rem;color:var(--text-2);">${reasons}</ul>` : ''}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <a class="btn btn-outline btn-sm" href="#" onclick="document.querySelector('[data-target=&quot;tab-security&quot;]').click();return false;">Full report</a>
+        <a class="btn btn-outline btn-sm" href="/attestations?id=${encodeURIComponent(s.id)}">Attestation</a>
+      </div>`;
+  } catch (_) {
+    el.innerHTML = `${head}<div style="color:var(--text-3);font-size:0.8125rem;">Could not load the scan record.</div>`;
+  }
+}
+
 const App = {
   currentUser: null,
   _serverCache: {},
@@ -348,10 +397,9 @@ const App = {
     if (page === 'index')                                    this.initHomePage();
     else if (page === 'servers')                             this.initServersPage();
     else if (page === 'server-detail')                       this.initServerDetailPage();
-    else if (page === 'publish')  {
-      if (!this.currentUser) { window.location.href = '/login.html'; return; }
-      this.initPublishPage();
-    }
+    // publish.html runs the submission-gate flow itself (and sends logged-out
+    // users to /login on submit); the old direct-listing form handler is retired.
+    else if (page === 'publish')                             { /* handled by publish.html */ }
     else if (page === 'clients')                             this.initClientsPage();
     else if (page === 'categories')                          this.initCategoriesPage();
     else if (page === 'login')                               this.initLoginPage();
@@ -450,17 +498,20 @@ const App = {
       if (statsEl) {
         statsEl.className = 'stats-grid';
         statsEl.innerHTML = [
-          Components.createStatCard('Total Servers',      (st.totalServers  || MOCK_STATS.totalServers).toLocaleString()),
-          Components.createStatCard('Publishers',         (st.totalPublishers|| MOCK_STATS.totalPublishers).toLocaleString()),
-          Components.createStatCard('Total Installs',     st.totalInstalls  || MOCK_STATS.totalInstalls),
-          Components.createStatCard('Client Integrations',st.totalClients   || MOCK_STATS.totalClients),
+          // Real counts only: the catalog lists just the servers that passed the gate.
+          Components.createStatCard('Total Servers',      (st.totalServers   || 0).toLocaleString()),
+          Components.createStatCard('Publishers',         (st.totalPublishers|| 0).toLocaleString()),
+          Components.createStatCard('Total Installs',     (st.totalInstalls  || 0).toLocaleString()),
+          Components.createStatCard('Client Integrations',(st.totalClients   || 0).toLocaleString()),
         ].join('');
       }
 
       if (featEl) {
-        const servers = serversResp?.data || serversResp || MOCK_SERVERS;
-        const displayServers = (Array.isArray(servers) && servers.length) ? servers : MOCK_SERVERS;
-        featEl.innerHTML = displayServers.slice(0, 6).map(s => Components.createServerCard(s)).join('');
+        const servers = serversResp?.servers || serversResp?.data || (Array.isArray(serversResp) ? serversResp : []);
+        featEl.innerHTML = servers.length
+          ? servers.slice(0, 6).map(s => Components.createServerCard(s)).join('')
+          : Components.createEmptyState('No servers listed yet', 'Every server is scanned by MCP Secure before it is listed. Publish one to see the gate in action.',
+              { href: '/publish.html', label: 'Publish a Server' });
       }
 
       if (catsEl) {
@@ -562,14 +613,7 @@ const App = {
       if (servers.length) {
         grid.innerHTML = servers.map(s => Components.createServerCard(s)).join('');
       } else {
-        // Fallback to filtered mock data
-        const q    = (this.currentServersFilters.q || '').toLowerCase();
-        const mock = q
-          ? MOCK_SERVERS.filter(s => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
-          : MOCK_SERVERS;
-        grid.innerHTML = mock.length
-          ? mock.map(s => Components.createServerCard(s)).join('')
-          : Components.createEmptyState(
+        grid.innerHTML = Components.createEmptyState(
               'No servers found',
               'Try adjusting your search or filters, or be the first to publish one!',
               { href: '/publish.html', label: 'Publish Your First Server' }
@@ -578,8 +622,7 @@ const App = {
 
       if (paginator) paginator.innerHTML = Components.createPagination(this.currentServersPage, totalPages);
     } catch (err) {
-      // Show mock data on API error
-      grid.innerHTML = MOCK_SERVERS.map(s => Components.createServerCard(s)).join('');
+      grid.innerHTML = Components.createEmptyState('Could not load servers', String(err.message || err));
     }
   },
 
@@ -593,20 +636,23 @@ const App = {
   async initServerDetailPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const slug = urlParams.get('slug');
-    if (!slug) { window.location.href = '/servers.html'; return; }
+    if (!slug || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) { window.location.href = '/servers.html'; return; }
 
     try {
       let server;
       try {
         server = await API.getServer(slug);
       } catch (_) {
-        server = MOCK_SERVERS.find(s => s.slug === slug) || MOCK_SERVERS[0];
+        const header = document.getElementById('server-header');
+        if (header) header.innerHTML = Components.createEmptyState('Server not found', 'This server is not listed (it may be in review, rejected, or never published).');
+        return;
       }
 
       document.title = `${server.name} — MCP Marketplace`;
 
       const breadcrumb = document.getElementById('server-breadcrumb');
       if (breadcrumb) breadcrumb.textContent = server.name;
+      server = escapeServer(server); // everything below builds HTML from listing text
 
       const authorName   = server.author_display_name || server.author_username || server.author || 'Publisher';
       const tagsList     = (server.tags || []).map(t => typeof t === 'object' ? (t.name || t.slug) : t);
@@ -623,10 +669,7 @@ const App = {
               <div>
                 <h1 style="margin-bottom:0.35rem;display:flex;align-items:center;gap:0.875rem;flex-wrap:wrap;font-size:1.875rem;">
                   ${server.name}
-                  <span class="badge badge-success" style="font-size:0.8rem;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Verified Publisher
-                  </span>
+                  ${securityBadge(server)}
                 </h1>
                 <p style="margin:0;color:var(--text-2);font-size:0.9375rem;">
                   Published by <strong style="color:var(--text-1);">${authorName}</strong>
@@ -635,11 +678,12 @@ const App = {
             </div>
             <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
               <button class="btn btn-outline" style="border-color:var(--accent-cyan);color:var(--accent-cyan);"
-                onclick="navigator.clipboard.writeText('npx -y ${server.npm_package || '@modelcontextprotocol/server-' + slug}');App.showToast('CLI command copied!','success');return false;">
+                data-cmd="npx -y ${server.npm_package || '@modelcontextprotocol/server-' + slug}"
+                onclick="navigator.clipboard.writeText(this.dataset.cmd);App.showToast('CLI command copied!','success');return false;">
                 <svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='14' height='14' x='8' y='8' rx='2' ry='2'/><path d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/></svg>
                 Copy Install
               </button>
-              <a href="${server.github_url || '#'}" target="_blank" class="btn btn-outline">
+              <a href="${/^https?:\/\//.test(server.github_url || '') ? server.github_url : '#'}" target="_blank" rel="noopener" class="btn btn-outline">
                 Repository
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
               </a>
@@ -649,10 +693,6 @@ const App = {
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-            <span class="client-chip" style="font-size:0.85rem;padding:0.35rem 0.85rem;">✓ Claude Desktop</span>
-            <span class="client-chip" style="font-size:0.85rem;padding:0.35rem 0.85rem;">✓ Cursor</span>
-            <span class="client-chip" style="font-size:0.85rem;padding:0.35rem 0.85rem;">✓ VS Code / Cline</span>
-            <span style="border-left:1px solid var(--border);height:20px;margin:0 0.25rem;"></span>
             ${langBadge(server.language || 'TypeScript')}
             <span class="badge badge-default">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -671,9 +711,6 @@ const App = {
         overviewEl.innerHTML = `
           <div class="doc-box">
             <h3>Documentation</h3>
-            <div class="callout-box">
-              <strong>Research Notice:</strong> This server is fully instrumented for security research. Switch to the <strong>Tools</strong> tab to inspect tool schemas and test execution boundaries.
-            </div>
             <div style="margin-top:1.5rem;line-height:1.75;color:var(--text-2);white-space:pre-line;">
               ${server.long_description || server.description || 'No extended documentation provided.'}
             </div>
@@ -733,53 +770,21 @@ const App = {
             </div>
           </div>
 
-          <div class="card" style="margin-bottom:1rem;">
+          <div class="card" id="mcs-scan-summary">
             <h3 style="font-size:0.75rem;text-transform:uppercase;color:var(--accent-cyan);letter-spacing:0.06em;border-bottom:1px solid var(--border);padding-bottom:0.65rem;margin-bottom:1rem;">
-              Client Compatibility
+              🛡️ MCP Secure scan
             </h3>
-            <div class="info-property-box" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2);">
-              <span class="prop-key">Claude Desktop</span>
-              <span class="prop-val" style="color:var(--accent);">● Native</span>
-            </div>
-            <div class="info-property-box" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2);">
-              <span class="prop-key">Cursor / Windsurf</span>
-              <span class="prop-val" style="color:var(--accent);">● Ready</span>
-            </div>
-            <div class="info-property-box" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2);">
-              <span class="prop-key">VS Code / Cline</span>
-              <span class="prop-val" style="color:var(--accent);">● Verified</span>
-            </div>
-          </div>
-
-          <div class="card" style="background:#04090c;border-color:rgba(239,68,68,0.2);">
-            <h3 style="font-size:0.75rem;text-transform:uppercase;color:#f87171;letter-spacing:0.06em;border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.65rem;margin-bottom:1rem;">
-              🛡️ Security Scorecard
-            </h3>
-            <div style="font-size:0.8125rem;display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;">
-              <div style="display:flex;justify-content:space-between;">
-                <span style="color:var(--text-3);">Sandbox Boundary</span>
-                <strong style="color:var(--accent);">Isolated</strong>
-              </div>
-              <div style="display:flex;justify-content:space-between;">
-                <span style="color:var(--text-3);">Input Inspection</span>
-                <strong style="color:var(--accent);">Schema Enforced</strong>
-              </div>
-              <div style="display:flex;justify-content:space-between;">
-                <span style="color:var(--text-3);">Threat Test</span>
-                <strong style="color:var(--accent-cyan);">Simulator Active</strong>
-              </div>
-            </div>
-            <div class="callout-box" style="margin:0;font-size:0.775rem;border-color:var(--accent);background:rgba(16,185,129,0.06);color:#a5f3fc;">
-              <strong>Test Bench:</strong> Click <em>Test Tool</em> in the Tools tab to run custom execution payloads.
-            </div>
+            <div style="color:var(--text-3);font-size:0.8125rem;">Loading the latest scan…</div>
           </div>
         `;
       }
 
-      // Load tools
+      loadScanSummary(slug);
+
+      // Load tools (the tools declared for this listing; no mock fallback)
       let tools = null;
       try { tools = await API.getServerTools(slug); } catch (_) {}
-      tools = (Array.isArray(tools) && tools.length) ? tools : (MOCK_TOOLS_BY_SERVER[slug] || []);
+      tools = Array.isArray(tools) ? tools : [];
 
       const toolsEl = document.getElementById('tab-tools');
       if (toolsEl) {
@@ -1034,10 +1039,12 @@ const App = {
       try {
         const response = await API.getServers({ author: username });
         const servers  = response?.data || response || [];
-        const list     = (Array.isArray(servers) && servers.length) ? servers : MOCK_SERVERS.slice(0, 3);
-        serversEl.innerHTML = list.map(s => Components.createServerCard(s)).join('');
+        const list     = Array.isArray(response?.servers) ? response.servers : (Array.isArray(servers) ? servers : []);
+        serversEl.innerHTML = list.length
+          ? list.map(s => Components.createServerCard(s)).join('')
+          : Components.createEmptyState('No listed servers yet', 'Servers appear here once they pass the MCP Secure gate.');
       } catch (_) {
-        serversEl.innerHTML = MOCK_SERVERS.slice(0, 3).map(s => Components.createServerCard(s)).join('');
+        serversEl.innerHTML = Components.createEmptyState('Could not load servers', '');
       }
     }
   },
