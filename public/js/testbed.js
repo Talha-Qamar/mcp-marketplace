@@ -8,11 +8,12 @@
  * demoMode.
  */
 const MCSTestbed = (() => {
-  // [branch, threat, correct verdict]
+  // [branch, threat, correct verdict]. Code cases only: the tool-description
+  // (Model A) cases stay in the testbed repo but are out of scope for Mid 1.
   const CASES = [
     ['clean-weather-py', 'clean', 'PASS'],
     ['rugpull-weather-py', 'rug pull (command injection)', 'FAIL'],
-    ['safe-sql-ts', 'preference manipulation (description)', 'REVIEW'],
+    ['safe-sql-ts', 'parameterised SQL (safe code)', 'PASS'],
     ['rugpull-sql-ts', 'rug pull (SQL injection)', 'FAIL'],
     ['cmd-injection-shell-runner-py', 'command injection (CWE-78)', 'FAIL'],
     ['cmd-injection-os-system-py', 'command injection (CWE-78)', 'FAIL'],
@@ -31,16 +32,11 @@ const MCSTestbed = (() => {
     ['hidden-dist-entrypoint-ts', 'hiding: committed dist/ differs from src/', 'FAIL'],
     ['hidden-skipped-dir-py', 'hiding: runtime code under examples/', 'FAIL'],
     ['runtime-description-py', 'coverage: description built at runtime', 'REVIEW'],
-    ['tool-poisoning-param-py', 'tool poisoning (parameter description)', 'FAIL'],
-    ['tool-poisoning-zero-width-py', 'tool poisoning (zero-width characters)', 'FAIL'],
-    ['tool-poisoning-classic-py', 'tool poisoning (<IMPORTANT> block)', 'FAIL'],
-    ['tool-shadowing-py', 'tool shadowing', 'FAIL'],
     ['benign-subprocess-argv-py', 'clean', 'PASS'],
     ['benign-shlex-py', 'clean', 'PASS'],
     ['benign-utility-py', 'clean', 'PASS'],
     ['benign-execfile-ts', 'clean', 'PASS'],
     ['benign-ts', 'clean', 'PASS'],
-    ['benign-security-words-py', 'clean', 'PASS'],
     ['unsupported-go', 'coverage: unsupported language', 'REVIEW'],
     ['watcher-demo', 'live rug pull (push the bait commit, then Poll Now)', 'PASS'],
   ];

@@ -22,7 +22,8 @@ const TESTBED_REPO = process.env.MCS_TESTBED_REPO || 'https://github.com/Talha-Q
  * Per-IP limit for the open scan endpoints (scan-preview, verify-external):
  * each request clones and scans a repository. MCS_SCAN_RATE_LIMIT per hour.
  */
-const SCAN_LIMIT = Number(process.env.MCS_SCAN_RATE_LIMIT || 30);
+// Demo mode allows more: one presenter scans many testbed cases from one machine.
+const SCAN_LIMIT = Number(process.env.MCS_SCAN_RATE_LIMIT || (DEMO_MODE ? 300 : 30));
 const scanHits = new Map();
 function scanRateLimit(req, res, next) {
   const key = req.ip;
