@@ -10,9 +10,12 @@ const { ensureLocalAnalyzers, stopLocalAnalyzers } = require('../src/mcpsecure/o
 const { loadRegistry } = require('../src/mcpsecure/orchestrator/registry');
 const { DEMO_SERVERS } = require('../src/mcpsecure/seed');
 
+// [without bait, with the _bait/ rug-pull overlay]; null = no bait overlay for this server.
+// db-helper's code is safe (its manipulative descriptions are Model A's job, out of scope).
 const EXPECTED = {
   'weather-tools': ['PASS', 'FAIL'],
-  'db-helper': ['REVIEW', 'FAIL'],
+  'db-helper': ['PASS', 'FAIL'],
+  'docs-helper': ['REVIEW', null],
   'shell-runner': ['FAIL', 'FAIL'],
 };
 
@@ -32,6 +35,7 @@ test('demo verdicts (with and without bait-and-switch)', { timeout: 300000 }, as
   try {
     for (const demo of DEMO_SERVERS) {
       for (const [i, bait] of [false, true].entries()) {
+        if (EXPECTED[demo.slug][i] === null) continue;
         const out = await runPipeline({
           source: { kind: 'local', path: `demo_servers/${demo.slug}`, overlay: bait ? `demo_servers/_bait/${demo.slug}` : undefined },
           listing: { name: demo.name, description: demo.description },

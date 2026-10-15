@@ -60,7 +60,9 @@ test('REVIEW preset → admin queue → note required → approve → listed', a
   await page.getByRole('button', { name: 'Review Queue' }).click();
   const card = page.locator('.review-card', { hasText: slug });
   await expect(card).toBeVisible();
-  await expect(card).toContainText('score_thresholds');
+  // the reviewer sees why: the rule and its evidence
+  await expect(card).toContainText('Why this verdict');
+  await expect(card).toContainText('built at runtime');
 
   // approving without a note is refused
   let dialog = '';
@@ -68,7 +70,7 @@ test('REVIEW preset → admin queue → note required → approve → listed', a
   await card.getByRole('button', { name: /Approve/ }).click();
   expect(dialog).toContain('note');
 
-  await card.locator('.review-note').fill('E2E: descriptions are marketing copy; code is parameterised SQL.');
+  await card.locator('.review-note').fill('E2E: description file reviewed by hand; harmless.');
   await card.getByRole('button', { name: /Approve/ }).click();
   await expect(card).toContainText('(saved)');
 

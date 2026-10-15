@@ -541,7 +541,6 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
 
   const analyzerNames = {
     'AST_TAINT': { label: 'AST Taint Analysis', sublabel: 'command injection · dangerous sinks', color: '#06b6d4', sim: true },
-    'MODEL_A_TEXT': { label: 'Model A (Text Poisoning)', sublabel: 'tool poisoning · PMA attack detection', color: '#06b6d4', sim: true },
     'MODEL_B_CODE': { label: 'Model B (Code Obfuscation)', sublabel: 'obfuscation · evasion · learned injection', color: '#06b6d4', sim: true },
   };
 
@@ -629,10 +628,10 @@ async function renderPipelineAnimation(container, scanResult, onComplete, liveFa
 
   const descMap = {
     PASS: 'All detection models clear. No threats detected. Clearance granted for hash generation and blockchain storage.',
-    REVIEW: 'Potential threats or suspicious wording detected. Routing to Model C triage. Hashes and blockchain storage withheld.',
+    REVIEW: 'Uncertain: a finding could not be proven, or part of the server could not be analysed. It waits for a human reviewer. Hashes and blockchain storage withheld.',
     FAIL: 'Critical security threats detected! Server rejected. Hashes withheld from blockchain registration.',
   };
-  vEl.innerHTML += `<p style="margin-top:1rem;color:var(--text-2);">${descMap[verdict]}</p>`;
+  vEl.innerHTML += `<p style="margin-top:1rem;color:var(--text-2);">${descMap[verdict]}</p>` + renderVerdictEvidence(scanRecord);
   stageDone('stage-verdict');
 
   // ── Model C (REVIEW only) ─────────────────────────────────────────────────
@@ -1595,6 +1594,89 @@ const MCSViews = (() => {
 
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WHY THIS VERDICT: the findings and rules behind a FAIL or REVIEW, with the
+// exact code lines (shared by the scan, publish, admin, server and verify pages)
+// ═══════════════════════════════════════════════════════════════════════════
+const THREAT_LABEL = {
+  command_injection: 'Command injection', code_injection: 'Code injection', path_traversal: 'Path traversal',
+  ssrf: 'SSRF', sql_injection: 'SQL injection', unsafe_deserialization: 'Unsafe deserialization',
+  tool_poisoning: 'Tool poisoning', metadata_mismatch: 'Declared ≠ discovered tools',
+};
+const RULE_TEXT = {
+  ast_high_hard_fail: 'Tool input reaches a shell/exec call (proven by the AST taint analyzer): automatic FAIL.',
+  score_thresholds: 'The highest finding score crossed a threshold (≥ 0.75 FAIL, ≥ 0.40 REVIEW).',
+  required_analyzer_unavailable: 'A required analyzer did not run, so the server cannot PASS.',
+  unpinned_analyzer_version: 'The analyzer version is not the pinned one, so the server cannot PASS.',
+  insufficient_code_coverage: 'No code analyzer could analyse this source (e.g. an unsupported language).',
+  no_tools_discovered: 'No MCP tools were found, so tool input could not be traced.',
+  source_not_fully_analysed: 'Some code files were too large or too many to analyse.',
+  runtime_descriptions: 'A tool description is built at runtime and could not be checked.',
+};
+
+function renderVerdictEvidence(scanRecord) {
+  if (!scanRecord || !scanRecord.policy) return '';
+  const pol = scanRecord.policy;
+  const all = new Map();
+  for (const slot of scanRecord.results || []) {
+    for (const f of slot.findings || []) all.set(f.finding_id, { ...f, slot: slot.slot, analyzerName: slot.display_name || slot.slot });
+  }
+  const decisive = (pol.reasons || []).filter(r => r.verdict);
+  const counted = (pol.effective_findings || []).filter(e => e.effective_score >= 0.4);
+  const evidenceOnly = (pol.effective_findings || []).length - counted.length;
+  if (!decisive.length && !counted.length) {
+    return `<div class="mcs-evidence"><div class="mcs-evidence-title">Why this verdict</div>
+      <p style="margin:0;color:var(--text-2);font-size:0.85rem;">No rule fired: every required analyzer ran, the code was covered, and no finding reached the review threshold.${evidenceOnly ? ` (${evidenceOnly} low-score finding(s) kept as evidence only.)` : ''}</p></div>`;
+  }
+  const rules = decisive.map(r => `<li><strong>${escapeHtml(r.verdict)}</strong> · ${escapeHtml(RULE_TEXT[r.rule] || r.rule)}<br><span style="color:var(--text-3);">${escapeHtml(r.message)}</span></li>`).join('');
+  const cards = counted.slice(0, 8).map(e => {
+    const f = all.get(e.finding_id) || {};
+    const loc = f.location || {};
+    const d = f.details || {};
+    const where = loc.file ? `${escapeHtml(loc.file)}${loc.line ? ':' + loc.line : ''}${loc.function ? ` in <code>${escapeHtml(loc.function.name)}()</code>` : ''}` : 'listing text';
+    const lines = (d.evidence_lines || (d.code_excerpt ? [{ line: loc.line, text: d.code_excerpt }] : []))
+      .map(l => `<div><span class="mcs-evidence-ln">${escapeHtml(l.line || '')}</span>${escapeHtml(l.text)}</div>`).join('');
+    const path = Array.isArray(d.path) && d.path.length ? d.path.join(' → ') + (d.sink ? ` → ${d.sink}` : '') : '';
+    const scoreNote = e.effective_score < e.raw_score
+      ? `score ${e.raw_score.toFixed(2)} → <strong>${e.effective_score.toFixed(2)}</strong> (capped: no proven data flow)`
+      : `score <strong>${e.effective_score.toFixed(2)}</strong>${e.corroborated_by ? (String(e.corroborated_by).startsWith('sha256:') ? ' · confirmed by a taint analyzer' : ` · ${escapeHtml(e.corroborated_by).replace('_', ' ')}`) : ''}`;
+    const color = e.effective_score >= 0.75 ? '#ef4444' : '#f59e0b';
+    return `<div class="mcs-evidence-card" style="border-left-color:${color};">
+      <div style="display:flex;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+        <strong style="color:${color};">${escapeHtml(THREAT_LABEL[e.threat] || e.threat)}</strong>
+        <span style="font-size:0.78rem;color:var(--text-3);">${escapeHtml(f.analyzerName || e.slot)} · ${scoreNote}</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text-2);margin:0.3rem 0;">${where}</div>
+      ${lines ? `<pre class="mcs-evidence-code">${lines}</pre>` : ''}
+      ${path ? `<div style="font-size:0.78rem;color:var(--text-3);">Taint path: <code>${escapeHtml(path)}</code></div>` : ''}
+      ${f.summary && !path ? `<div style="font-size:0.78rem;color:var(--text-3);">${escapeHtml(f.summary)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="mcs-evidence">
+    <div class="mcs-evidence-title">Why this verdict</div>
+    ${rules ? `<ul class="mcs-evidence-rules">${rules}</ul>` : ''}
+    ${cards}
+    ${counted.length > 8 ? `<div style="font-size:0.78rem;color:var(--text-3);">… and ${counted.length - 8} more finding(s).</div>` : ''}
+    ${evidenceOnly ? `<div style="font-size:0.78rem;color:var(--text-3);margin-top:0.4rem;">${evidenceOnly} lower-score finding(s) kept as evidence only (they did not change the verdict).</div>` : ''}
+  </div>`;
+}
+window.renderVerdictEvidence = renderVerdictEvidence;
+
+(function evidenceStyles() {
+  if (document.getElementById('mcs-evidence-css')) return;
+  const st = document.createElement('style');
+  st.id = 'mcs-evidence-css';
+  st.textContent = `
+    .mcs-evidence{margin-top:1rem;text-align:left}
+    .mcs-evidence-title{font-weight:700;font-size:0.9rem;margin-bottom:0.5rem}
+    .mcs-evidence-rules{margin:0 0 0.75rem 1.1rem;padding:0;font-size:0.82rem;line-height:1.55}
+    .mcs-evidence-card{border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:6px;padding:0.6rem 0.75rem;margin-bottom:0.6rem;background:rgba(127,127,127,0.04)}
+    .mcs-evidence-code{margin:0.35rem 0;padding:0.5rem 0.6rem;background:rgba(0,0,0,0.35);border-radius:4px;font-family:var(--font-mono,monospace);font-size:0.78rem;white-space:pre-wrap;word-break:break-all;color:#e5e7eb}
+    .mcs-evidence-ln{display:inline-block;min-width:2.5rem;color:#9ca3af;user-select:none}
+  `;
+  document.head.appendChild(st);
+})();
 
 function escapeHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

@@ -66,7 +66,7 @@ test('marketplace API: scan stream, gate, supersede, admin decision', { skip: !H
     assert.equal((await alice('POST', '/api/auth/register', { username: 'alice', email: 'a@x.test', password: 'pw123456' })).status, 201);
     assert.equal((await alice('POST', '/api/servers', {})).status, 410); // no unscanned publishing
 
-    const first = await alice('POST', '/api/v1/submissions', { name: 'Notes', slug: 'alice-notes', source: { kind: 'demo', name: 'db-helper' } });
+    const first = await alice('POST', '/api/v1/submissions', { name: 'Notes', slug: 'alice-notes', source: { kind: 'demo', name: 'docs-helper' } });
     assert.equal(first.status, 202);
     assert.equal(first.json.server.listing_status, 'pending');
     const r1 = await waitState(alice, first.json.submission.id);
@@ -74,7 +74,7 @@ test('marketplace API: scan stream, gate, supersede, admin decision', { skip: !H
     assert.equal((await alice('GET', '/api/servers?limit=100')).json.servers.some(s => s.slug === 'alice-notes'), false);
 
     // a newer version supersedes the pending one
-    const second = await alice('POST', '/api/v1/submissions', { name: 'Notes', slug: 'alice-notes', source: { kind: 'demo', name: 'db-helper' } });
+    const second = await alice('POST', '/api/v1/submissions', { name: 'Notes', slug: 'alice-notes', source: { kind: 'demo', name: 'docs-helper' } });
     assert.equal((await alice('GET', `/api/v1/submissions/${first.json.submission.id}`)).json.submission.state, 'superseded');
     await waitState(alice, second.json.submission.id);
 

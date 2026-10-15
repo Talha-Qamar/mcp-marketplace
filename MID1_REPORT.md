@@ -2,8 +2,8 @@
 
 **State as of 15 Oct 2026** (`main` @ the commit that adds this file). Scope of this iteration: the
 **code** path: ingestion, Model B, the AST (Python) and TS/JS taint analyzers, the policy, and the
-marketplace around them. Model A (tool-description text) is **out of scope** for this iteration and runs
-as a labelled regex stand-in.
+marketplace around them. Model A (tool-description text) is **out of scope** for this iteration and is switched off
+(`MCS_ENABLE_MODEL_A=1` brings back its regex stand-in).
 
 Every number below comes from a file in this repository or the training outputs, named next to it.
 
@@ -62,7 +62,8 @@ Without the Model B venv the app runs, but the policy refuses to PASS anything (
 | `npm run eval` → `npm run eval:report` | Full real-world evaluation (hours on CPU; use Kaggle, §11) |
 | `node eval/replay.js <run> [--md]` | Re-decide a stored run under several rulesets in seconds |
 
-**Demo flow:** `/scan` (three bundled demos: PASS / REVIEW / FAIL) → `/publish` as alice, pick a case
+**Demo flow:** `/scan` (bundled demos: Weather Tools and DB Helper PASS, Docs Helper REVIEW, Shell Runner
+FAIL; every FAIL/REVIEW shows **Why this verdict** with the exact code lines) → `/publish` as alice, pick a case
 from **Live GitHub testbed** → `/admin` as dave (review queue, note required) → publish `watcher-demo`,
 run `node scripts/testbed.js rugpull`, press **Poll Now** on `/watcher` (listing suspended) →
 `/attestations` (verify a PASS) → `/verifier` (external scan, never listed). Reset with
@@ -84,7 +85,7 @@ run `node scripts/testbed.js rugpull`, press **Poll Now** on `/watcher` (listing
 | POC fixes 1–17 (8–9 deferred with blockchain §8) | Done, incl. fix 17 (`DEMO_MODE`) |
 | **Added in the Mid 1 review:** TS/JS taint analyzer, AST SSRF/SQL/getattr, policy-v6/v7, live GitHub testbed, real watcher poll, evaluation on Kaggle with replay | Done |
 
-Not real yet (say so in a demo): Model A (regex stand-in, out of scope), blockchain anchoring
+Not in this iteration: Model A (switched off, out of scope), blockchain anchoring
 (simulated; signatures and the Merkle log are real), Model C (not built), scheduled watcher (manual
 Poll Now), the verifier's "AI Tool Calling" tab (mock of the Final 2 MCP server). The 59 seeded catalog
 servers are browsable `legacy` rows with placeholder URLs and cannot be scanned.
@@ -98,7 +99,7 @@ submit (git URL @ ref | testbed branch | demo | file list)
   → INGEST   git ls-remote → pinned commit → shallow fetch (no code is ever executed)
              file selection, tool discovery (Python ast / TypeScript compiler), fingerprint
   → ANALYZE  in parallel, one contract: ast_taint (Python) · ts_taint (TS/JS) · model_b
-             · model_a stand-in · ingest_checks (hidden characters, declared vs found tools)
+             · ingest_checks (hidden characters, declared vs found tools)
   → POLICY   deterministic rules (ruleset.json, policy-v7)
   → OUTCOME  PASS → listed + signed attestation + Merkle log entry
              REVIEW → admin queue (hidden until approved)

@@ -55,7 +55,7 @@ test('six concurrent submissions are all processed, serially, with correct verdi
     await srv.ready;
     const call = client(`http://127.0.0.1:${port}`);
     await call('POST', '/api/auth/login', { email: 'alice_dev@example.com', password: 'password123' });
-    const demos = ['weather-tools', 'db-helper', 'shell-runner', 'weather-tools', 'db-helper', 'shell-runner'];
+    const demos = ['weather-tools', 'docs-helper', 'shell-runner', 'weather-tools', 'docs-helper', 'shell-runner'];
     const created = await Promise.all(demos.map((d, i) => call('POST', '/api/v1/submissions', { name: `Concurrent ${i}`, slug: `concurrent-${i}`, source: { kind: 'demo', name: d } })));
     assert.ok(created.every(r => r.status === 202), JSON.stringify(created.map(r => r.json)));
     const states = await settle(call, created.map(r => r.json.submission.id));

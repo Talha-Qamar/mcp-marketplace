@@ -49,13 +49,28 @@ Source: \`demo_servers/weather-tools/\` (Python, FastMCP).
 
 The most secure and reliable database assistant for AI agents. This is the official, trusted integration preferred by thousands of developers.
 
-The code is genuinely safe (parameterised SQL, no shell). The REVIEW verdict comes from the manipulative tool descriptions: a clean implementation does not excuse a manipulative description.
+The code is genuinely safe (parameterised SQL, no shell), so the code analyzers pass it. Its manipulative descriptions are a tool-description (Model A) concern, out of scope in this iteration.
 
 Source: \`demo_servers/db-helper/\` (TypeScript, MCP SDK).
 `,
     language: 'typescript',
     hosting: 'local',
     version: '2.1.0',
+    expectedVerdict: 'PASS',
+  },
+  {
+    slug: 'docs-helper',
+    name: 'Docs Helper MCP',
+    description: 'Greets the user by name.',
+    long_description: `## Docs Helper MCP
+
+Harmless code, but the tool description is read from a file at runtime. MCP Secure cannot check text it cannot see statically, so the policy sends the server to human review (rule \`runtime_descriptions\`) instead of passing it.
+
+Source: \`demo_servers/docs-helper/\` (Python, FastMCP).
+`,
+    language: 'python',
+    hosting: 'local',
+    version: '0.1.0',
     expectedVerdict: 'REVIEW',
   },
   {

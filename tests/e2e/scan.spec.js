@@ -4,7 +4,8 @@ const { policyVersion } = require('../../src/mcpsecure/ruleset.json');
 
 for (const [slug, pick, verdict, analyzerText] of [
   ['weather-tools', '#pick-weather', 'PASS', 'AST taint analyzer'],
-  ['db-helper', '#pick-dbhelper', 'REVIEW', 'Model A'],
+  ['db-helper', '#pick-dbhelper', 'PASS', 'Model B'],
+  ['docs-helper', '#pick-docshelper', 'REVIEW', 'AST taint analyzer'],
   ['shell-runner', '#pick-shell', 'FAIL', 'AST taint analyzer'],
 ]) {
   test(`scan page: ${slug} streams live stages and ends in ${verdict}`, async ({ page }) => {
@@ -23,13 +24,12 @@ for (const [slug, pick, verdict, analyzerText] of [
   });
 }
 
-test('scan page: real analyzers are labelled REAL ANALYSIS, the Model A stand-in SIMULATED', async ({ page }) => {
+test('scan page: the code analyzers are real, and Model A is not part of this iteration', async ({ page }) => {
   await page.goto('/scan');
   await page.click('#pick-weather');
   await page.click('#scan-btn');
   await expect(page.locator('#verdict-content')).toContainText('PASS', { timeout: 120_000 });
   const ast = page.locator('.mcs-analyzer-card', { hasText: 'AST taint analyzer' });
   await expect(ast).toContainText('REAL ANALYSIS');
-  const modelA = page.locator('.mcs-analyzer-card', { hasText: 'heuristic stand-in' });
-  await expect(modelA).toContainText('SIMULATED');
+  await expect(page.locator('#analyzers-grid')).not.toContainText('Model A');
 });

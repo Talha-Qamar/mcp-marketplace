@@ -167,16 +167,12 @@
             }
             el.innerHTML = queue.map(q => {
                 const pol = (q.scan && q.scan.policy) || { reasons: [], max_effective_score: 0 };
-                const flagged = ((q.scan && q.scan.analyzers) || []).flatMap(a =>
-                    a.evidence.slice(1).filter(e => !/^(No findings|note:|not applicable)/.test(e)).map(e => `${a.display_name}: ${e}`));
                 return `<div class="review-card" data-id="${q.id}">
                 <div style="flex:1 1 auto;min-width:0;">
                   <div style="font-weight:600;margin-bottom:0.2rem;">${escapeHtml(q.name)} <span style="color:var(--text-3);font-weight:400;">· ${escapeHtml(q.slug)} · by ${escapeHtml(q.submitter)}</span></div>
                   <div class="review-card-meta">Highest effective score: ${(pol.max_effective_score * 100).toFixed(0)}% · scan v${q.scan ? q.scan.version : '?'} · ${new Date(q.updatedAt).toLocaleString()}
                     ${q.scan && q.scan.subject && q.scan.subject.commit_sha ? ` · commit <code>${q.scan.subject.commit_sha.slice(0, 12)}</code>` : ''}</div>
-                  <ul style="margin:0.4rem 0 0 1rem;font-size:0.78rem;color:var(--text-2);">${pol.reasons.map(r => `<li><code>${escapeHtml(r.rule)}</code>: ${escapeHtml(r.message)}</li>`).join('')}</ul>
-                  ${flagged.length ? `<details style="margin-top:0.3rem;font-size:0.75rem;color:var(--text-3);"><summary>${flagged.length} finding(s)</summary><ul style="margin:0.3rem 0 0 1rem;">${flagged.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul></details>` : ''}
-                  <div style="margin-top:0.3rem;font-size:0.75rem;color:var(--text-3);">Model C: ${q.scan && q.scan.triage && q.scan.triage.recommendation ? escapeHtml(q.scan.triage.recommendation.decision + ' — ' + q.scan.triage.recommendation.rationale) : 'not configured (advisory only)'}</div>
+                  ${renderVerdictEvidence(q.scan)}
                   <input class="input review-note" placeholder="Decision note (required)" style="margin-top:0.5rem;font-size:0.8rem;">
                 </div>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">

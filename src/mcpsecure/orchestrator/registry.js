@@ -31,7 +31,9 @@ function expandEnv(value) {
 
 function loadRegistry() {
   const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-  return cfg.analyzers.map(a => {
+  // "enabled": false / "0" (after ${VAR} expansion) leaves a slot out of the pipeline.
+  const enabled = a => a.enabled === undefined || !['0', 'false', ''].includes(expandEnv(String(a.enabled)).trim().toLowerCase());
+  return cfg.analyzers.filter(enabled).map(a => {
     const url = a.url !== undefined ? expandEnv(a.url).replace(/\/$/, '') : '';
     let mode = 'none';
     let builtin = null;

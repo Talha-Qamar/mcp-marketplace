@@ -149,6 +149,7 @@
                     </div>
                 </div>
 
+                ${latest && latest.verdict !== 'PASS' ? `<div class="card" style="margin-bottom:1rem;">${renderVerdictEvidence(latest)}</div>` : ''}
                 ${latest ? `
                 <div id="inline-verify-container"></div>
 

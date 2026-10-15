@@ -27,7 +27,7 @@ const { waitForRequiredAnalyzers } = require('./orchestrator/local_services');
 const { parseRepoUrl, resolveCommit } = require('./ingest/sources');
 
 const STATE_FOR_VERDICT = { PASS: 'approved', REVIEW: 'in_review', FAIL: 'rejected' };
-const DEMO_SOURCES = new Set(['weather-tools', 'db-helper', 'shell-runner']);
+const DEMO_SOURCES = new Set(['weather-tools', 'db-helper', 'docs-helper', 'shell-runner']);
 // Demo-only features (bundled demo sources, simulated watcher updates). Off in
 // production unless DEMO_MODE=1 is set explicitly.
 const DEMO_MODE = process.env.DEMO_MODE ? process.env.DEMO_MODE === '1' : process.env.NODE_ENV !== 'production';
@@ -266,6 +266,7 @@ function reviewQueue() {
           verdict: scan.verdict,
           policy: scan.policy,
           analyzers: scan.analyzers,
+          results: scan.results,
           triage: scan.triage,
           subject: scan.subject,
           createdAt: scan.createdAt,

@@ -80,7 +80,39 @@ function legacyAnalyzers(slots, decision) {
     });
 }
 
-function compactResults(slots) {
+// Lines that show WHY a finding was raised, taken from the scanned source at
+// scan time (the record keeps no source otherwise). Taint analyzers point at the
+// exact sink line; Model B scores whole functions, so its evidence is the lines
+// in the function that use an API of the flagged class.
+const RISKY_LINE = {
+  command_injection: /\b(exec|execSync|execAsync|spawn|spawnSync|execFile|system|popen|subprocess|child_process|execa)\b|shell\s*[:=]\s*(true|True)/,
+  code_injection: /\b(eval|exec|Function|compile|runIn\w*Context|__import__|import_module|vm)\b/,
+  path_traversal: /\b(open|readFile\w*|writeFile\w*|appendFile\w*|createReadStream|createWriteStream|unlink\w*|readdir\w*|mkdir\w*|rmSync|rm|Path|send_file|sendFile|join)\b/,
+  ssrf: /\b(fetch|axios|requests|httpx|urlopen|urllib|got|aiohttp|request)\b/,
+  sql_injection: /\b(execute|executemany|query|raw|prepare|cursor)\b|\b(SELECT|INSERT|UPDATE|DELETE)\b/i,
+  unsafe_deserialization: /\b(pickle|marshal|yaml\.load|unserialize|deserialize|loads)\b/,
+};
+
+function evidenceFor(finding, files) {
+  const loc = finding.location || {};
+  const file = loc.file && files.get(loc.file);
+  if (!file) return null;
+  const lines = file.split('\n');
+  const at = n => ({ line: n, text: (lines[n - 1] || '').trim().slice(0, 220) });
+  const fn = loc.function;
+  if (fn && fn.start_line && fn.end_line && (!loc.line || loc.line === fn.start_line) && RISKY_LINE[finding.threat]) {
+    const re = RISKY_LINE[finding.threat];
+    const hits = [];
+    for (let n = fn.start_line; n <= Math.min(fn.end_line, lines.length) && hits.length < 3; n++) {
+      if (re.test(lines[n - 1] || '')) hits.push(at(n));
+    }
+    if (hits.length) return hits;
+  }
+  return loc.line ? [at(loc.line)] : null;
+}
+
+function compactResults(slots, bundle) {
+  const files = new Map(((bundle && bundle.files) || []).map(f => [f.path, f.content]));
   return slots.map(s => ({
     slot: s.slot,
     required: s.required,
@@ -92,7 +124,10 @@ function compactResults(slots) {
     status: s.result.status,
     error: s.result.error || null,
     coverage: s.result.coverage,
-    findings: s.result.findings || [],
+    findings: (s.result.findings || []).map(f => {
+      const ev = evidenceFor(f, files);
+      return ev ? { ...f, details: { ...(f.details || {}), evidence_lines: ev } } : f;
+    }),
   }));
 }
 
@@ -161,7 +196,7 @@ async function runScan(request, version = 1, onStage = null) {
       notes: bundle.coverage.notes,
     },
     analyzers: legacyAnalyzers(slots, decision),
-    results: compactResults(slots),
+    results: compactResults(slots, bundle),
     policy: {
       verdict: decision.verdict,
       reasons: decision.reasons,

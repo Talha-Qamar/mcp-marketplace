@@ -47,6 +47,9 @@ function materialize(caseDir, expect) {
 (async () => {
   const asJson = process.argv.includes('--json');
   await ensureLocalAnalyzers({ log: () => {} });
+  // Model A (tool-description text) is out of scope this iteration: a text case it would catch is
+  // reported as out of scope, not as a regression, while the slot is disabled.
+  const modelAOff = !require('../src/mcpsecure/orchestrator/registry').loadRegistry().some(s => s.id === 'model_a');
   const rows = [];
   for (const name of fs.readdirSync(DIR).sort()) {
     const caseDir = path.join(DIR, name);
@@ -57,7 +60,9 @@ function materialize(caseDir, expect) {
       const flags = out.slots.flatMap(s => (s.result.findings || []).filter(f => f.score >= 0.4)
         .map(f => `${s.slot}:${f.threat}:${f.score.toFixed(2)}`));
       rows.push({ case: name, group: expect.group, expect: expect.expect + (expect.threat ? `(${expect.threat})` : ''),
-        verdict: out.policy.verdict, ok: judge(expect, out), knownGap: expect.known_gap || null, rules: out.policy.reasons.map(r => r.rule), flags,
+        verdict: out.policy.verdict, ok: judge(expect, out),
+        knownGap: expect.known_gap || (modelAOff && expect.group === 'text' ? 'out of scope: Model A is disabled in this iteration' : null),
+        rules: out.policy.reasons.map(r => r.rule), flags,
         notes: out.bundle.coverage.notes });
     } catch (e) {
       rows.push({ case: name, group: expect.group, expect: expect.expect, verdict: 'ERROR', ok: false, knownGap: null, rules: [], flags: [], notes: [e.message] });
