@@ -499,10 +499,10 @@ const App = {
         statsEl.className = 'stats-grid';
         statsEl.innerHTML = [
           // Real counts only: the catalog lists just the servers that passed the gate.
-          Components.createStatCard('Total Servers',      (st.totalServers   || 0).toLocaleString()),
-          Components.createStatCard('Publishers',         (st.totalPublishers|| 0).toLocaleString()),
-          Components.createStatCard('Total Installs',     (st.totalInstalls  || 0).toLocaleString()),
-          Components.createStatCard('Client Integrations',(st.totalClients   || 0).toLocaleString()),
+          Components.createStatCard('Listed Servers',     (st.servers ?? st.totalServers ?? 0).toLocaleString()),
+          Components.createStatCard('Publishers',         (st.publishers ?? st.totalPublishers ?? 0).toLocaleString()),
+          Components.createStatCard('Total Installs',     (st.installs ?? st.totalInstalls ?? 0).toLocaleString()),
+          Components.createStatCard('Client Integrations',(st.clients ?? st.totalClients ?? 0).toLocaleString()),
         ].join('');
       }
 

@@ -358,10 +358,11 @@ function createUser(data) {
 }
 
 function getStats() {
+    // Counts cover listed servers only, like the catalog itself.
     const serverCount = oneRow(`SELECT COUNT(*) as count FROM servers s WHERE ${LISTED}`);
-    const userCount = oneRow(`SELECT COUNT(*) as count FROM users`);
-    const installCount = oneRow(`SELECT SUM(install_count) as count FROM servers`);
-    const toolCount = oneRow(`SELECT COUNT(*) as count FROM tools`);
+    const userCount = oneRow(`SELECT COUNT(DISTINCT s.author_id) as count FROM servers s WHERE ${LISTED}`);
+    const installCount = oneRow(`SELECT SUM(s.install_count) as count FROM servers s WHERE ${LISTED}`);
+    const toolCount = oneRow(`SELECT COUNT(*) as count FROM tools t JOIN servers s ON s.id = t.server_id WHERE ${LISTED}`);
     const clientCount = oneRow(`SELECT COUNT(*) as count FROM clients`);
     return {
         servers: serverCount ? serverCount.count : 0,
